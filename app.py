@@ -2,16 +2,14 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import json
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    if "private_key" in creds_dict:
-        pk = creds_dict["private_key"]
-        # Tự động làm sạch và chuẩn hóa mọi định dạng xuống dòng
-        pk = pk.replace("\\\\n", "\n").replace("\\n", "\n")
-        creds_dict["private_key"] = pk
-    return gspread.authorize(Credentials.from_service_account_info(creds_dict, scopes=scopes))
+    # Đọc trực tiếp file JSON chuẩn có sẵn trong kho GitHub
+    with open("service_account.json", "r", encoding="utf-8") as f:
+        creds_info = json.load(f)
+    return gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=scopes))
 try:
     gc = init_connection()
     worksheet = gc.open("QuanLyKho").worksheet("TonKho")
@@ -64,7 +62,6 @@ if not df.empty:
                 st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
-
 st.markdown("---")
 st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
 with st.form("add_form", clear_on_submit=True):
@@ -76,7 +73,7 @@ with st.form("add_form", clear_on_submit=True):
     with col2:
         don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Combo...)")
         nhat_ky = st.text_input("Nhật ký xuất nhập")
-        hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
+        hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)") 
     if st.form_submit_button("Lưu dữ liệu vào Google Sheets"):
         if ma_lk and ten_lk:
             worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi, nhat_ky, hinh_anh])
