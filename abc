@@ -1,13 +1,1 @@
-{
-  "type": "service_account",
-  "project_id": "abiding-rhythm-513703-v6",
-  "private_key_id": "04180b71b35af852b3de1eb169d59546bc4f7f38",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDM6LsjbFglZPbP\n8o2I4SvcpKFX7X0xTKGTLBfoHrAGctwgEjodjMD+7oDQ9huBb0nvVvoqAZ8S3Q5J\nvB/PHSxIDnCVH0ws6zHPtL2yuM3jybNVkmTejRP7+oaC6uKJtFRRRdLvnx8OEr/g\nEE/LHGGcJ1A+IWYp1RzVf5HYXa7Wl1YwLsr7K4PAUvii6yv21mXFtPBXSjbF9b0f\niNPMyA0Kc45wMaGtVA5i8XzGqPm7PC8VSe5983Xzb2rq0poxpuGzbSuN9C5oNY7S\nCTtYsSzn/kZyuchmG13cmq96iOv96lu2PEl7g/yaV/J2oEkxoSG0yuZ4q8mhuJ/9\nOI6GZRFxAgMBAAECggEACtGh6dejWswXJPkZRHghFPwDQc15/fOeF1NtarXOFPUV\nDsNvmpZPLVah6gaIgr/Bv1eQC049HCWcRsPeSRTw/Nf4VUNLBhcf8OfJ2UkdI9EH\nPTYmycJYowYB+qEUt3EUP5tIbRrxbJCMXXP3BpIXzEMeHz2rs3s7U8FxzaL6o31P\nXHVY6dyqNvvuRUKiziYINr+3F1hIXBYoznrtTl0Q0QyuHWrRewIZwdvwRfH50n+r\ngcv757CLUc0p/yUwdHDqze1KwZU2OvrPb4E7haB0OQlPqVlIOtf2tk//PJ6M2VQn\nJlWBh8zohSjveTBBLfeaod0BeA0GtgUVjt57d9xT3QKBgQDu0lDYsP59O3LUr1p5\nEpwx71UeeN3/XF6U8MRx0AKCdFNFv+fVrpR2j4EmnD9mgq/WinuZxV6YUdy6pukk\n+IsD7SLKRWx/tlhhsrfWKSy48OnapirU3Wa0h36zWSJ4Ch7mVb8rTZwcWF6h8NZp\nQLfTNRrUcQhsDzGE8kHCsW3OVQKBgQDbpfK1Sy/16tT8tS+XVIu0feCUqXEQ0ksq\nbciPZDpdptP6CZKC5OdgV3J46MoabUe+n3KrYR5mTs49ymGGah0WXVtdNHujELUQ\nsIQNnliJYkwY46B2AyufRNFLmSOcjzusiEL6KfPDeSZqdof77WBNE7e9doVKXs9r\nGJLuW0warQKBgHayx4X76nDZ5Ef7Y687ZbCX8Kl1j3kFMuk6BZk/to+aO202ZYbZ\n/2YyCxHipMxRdg3exHH4G/z+6wNGRCig848fBKSd/sA3JBRi3GYwDs9YxhJrdmxY\nIlzl3z5KtgwNk7ANvDdMmqOn9Fjut9KWXQc3pL8j8viqUIVwVujqgNYFAoGAfiyq\n6qfhSiP265/tUcIYartwmhVnxOD4msvrzSsnOAsQc+6xwg1aOIajVH9tMZcbAo63\noWktvFmCsg4izcMBKIrCZB009KwxRwAPK3+NnoXf7uA7me8iTOCMViAHS/Ufs3Gm\n/+u/gseCYN/sJ7Tpf/1WrDh8QweJoRzBsrixVBUCgYEAqLrSNYB8my0n+GjfjiOv\nfzwYbWxC4R1Wl2flevE/vXLIr7AMd/FtM8O1toDfk1dLhDvLV8VXgP0QE3w1fY/4\n5tjTaZm788VqF21A2mulqiGjfrdvszcOa04CJQHkZrCSqHDgwAlfP8DjRur3fDsH\nDWDo2syGfYPvurmosZ6JLgY=\n-----END PRIVATE KEY-----\n",
-  "client_email": "huynhnam@abiding-rhythm-513703-v6.iam.gserviceaccount.com",
-  "client_id": "115693946597021386582",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/huynhnam%40abiding-rhythm-513703-v6.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
+
