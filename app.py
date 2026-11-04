@@ -34,7 +34,6 @@ if not st.session_state.logged_in:
         submit = st.form_submit_button("Đăng nhập")
         
         if submit:
-            # Tài khoản mẫu (Bạn có thể đổi tên/mật khẩu tùy ý)
             if username == "admin" and password == "123456":
                 st.session_state.logged_in = True
                 st.session_state.role = "Admin"
@@ -68,7 +67,7 @@ if not df.empty:
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
 
-# Form nhập liệu (Dành cho cả Admin và Nhân viên)
+# Form nhập liệu
 st.subheader("➕ Thêm / Nhập Kho Linh Kiện Mới")
 with st.form("add_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
@@ -82,9 +81,8 @@ with st.form("add_form", clear_on_submit=True):
     submitted = st.form_submit_button("Lưu dữ liệu vào Google Sheets")
     if submitted:
         if ma_lk and ten_lk:
-            # Ghi dòng mới trực tiếp vào Google Sheet
             worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi])
             st.success("Đã lưu dữ liệu thành công lên Google Sheets vĩnh viễn!")
             st.rerun()
         else:
-            st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
+            st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")ng("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
