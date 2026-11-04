@@ -7,7 +7,10 @@ def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
     if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        pk = creds_dict["private_key"]
+        # Tự động làm sạch và chuẩn hóa mọi định dạng xuống dòng
+        pk = pk.replace("\\\\n", "\n").replace("\\n", "\n")
+        creds_dict["private_key"] = pk
     return gspread.authorize(Credentials.from_service_account_info(creds_dict, scopes=scopes))
 try:
     gc = init_connection()
