@@ -3,11 +3,14 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-# --- KẾT NỐI GOOGLE SHEETS TRỰC TIẾP TỪ FILE JSON TRÊN GITHUB ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    credentials = Credentials.from_service_account_file("service_account.json", scopes=scopes)
+    sec = st.secrets["gcp_service_account"]
+    creds_dict = dict(sec)
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(credentials)
 
 try:
@@ -34,18 +37,17 @@ if not st.session_state.logged_in:
             if username == "admin" and password == "123456":
                 st.session_state.logged_in = True
                 st.session_state.role = "Admin"
-                st.success("Đăng nhập thành công với quyền Admin!")
+                st.success("Đăng nhập thành công!")
                 st.rerun()
             elif username == "nhanvien" and password == "123456":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
-                st.success("Đăng nhập thành công với quyền Nhân viên!")
+                st.success("Đăng nhập thành công!")
                 st.rerun()
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
 
-# --- GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
     st.session_state.logged_in = False
@@ -54,7 +56,6 @@ if st.sidebar.button("Đăng xuất"):
 
 st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
 
-# Đọc dữ liệu từ Google Sheets
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 
@@ -85,7 +86,6 @@ if not df.empty:
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
 
-# Form nhập liệu
 st.markdown("---")
 st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
 with st.form("add_form", clear_on_submit=True):
