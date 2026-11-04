@@ -85,4 +85,4 @@ with st.form("add_form", clear_on_submit=True):
             st.success("Đã lưu dữ liệu thành công lên Google Sheets vĩnh viễn!")
             st.rerun()
         else:
-            st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")điền đầy đủ Mã và Tên linh kiện!")ng("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
+            st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
