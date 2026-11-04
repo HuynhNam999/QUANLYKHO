@@ -1,62 +1,90 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="Phần Mềm Quản Lý Tồn Kho", layout="wide")
+# --- PHẦN 1: KẾT NỐI GOOGLE SHEETS TỪ SECRETS ---
+@st.cache_resource
+def init_connection():
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    credentials = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes
+    )
+    return gspread.authorize(credentials)
 
-st.title("📦 PHẦN MỀM QUẢN LÝ TỒN KHO & BÓC TÁCH BOM COMBO")
-st.write("Giao diện quản lý tự động vận hành trên nền tảng Python")
+try:
+    gc = init_connection()
+    sh = gc.open("QuanLyKho")
+    worksheet = sh.worksheet("TonKho")
+except Exception as e:
+    st.error(f"Lỗi kết nối Google Sheets: Check lại tên file 'QuanLyKho' hoặc quyền Share email Bot! Chi tiết: {e}")
+    st.stop()
 
-# 1. Dữ liệu giả lập
-if 'kho' not in st.session_state:
-    st.session_state.kho = {
-        "LK-MATBAN-01": {"ten": "Mặt bàn gỗ sồi 1m2", "ton_dau": 100, "nhap": 50, "xuat": 20},
-        "LK-THANBAN01": {"ten": "Thân bàn gỗ", "ton_dau": 100, "nhap": 60, "xuat": 30},
-        "VT-DINH-01": {"ten": "Đinh vít 5cm", "ton_dau": 1000, "nhap": 500, "xuat": 200}
-    }
+# --- PHẦN 2: HỆ THỐNG ĐĂNG NHẬP PHÂN QUYỀN ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.role = None
 
-dinh_muc_combo = {
-    "SET-BANGO-01": [
-        {"ma_lk": "LK-MATBAN-01", "so_luong": 1},
-        {"ma_lk": "LK-THANBAN01", "so_luong": 1},
-        {"ma_lk": "VT-DINH-01", "so_luong": 4}
-    ]
-}
+if not st.session_state.logged_in:
+    st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ KHO")
+    with st.form("login_form"):
+        username = st.text_input("Tên đăng nhập")
+        password = st.text_input("Mật khẩu", type="password")
+        submit = st.form_submit_button("Đăng nhập")
+        
+        if submit:
+            # Tài khoản mẫu (Bạn có thể đổi tên/mật khẩu tùy ý)
+            if username == "admin" and password == "123456":
+                st.session_state.logged_in = True
+                st.session_state.role = "Admin"
+                st.success("Đăng nhập thành công với quyền Admin!")
+                st.rerun()
+            elif username == "nhanvien" and password == "123456":
+                st.session_state.logged_in = True
+                st.session_state.role = "Nhân viên"
+                st.success("Đăng nhập thành công với quyền Nhân viên!")
+                st.rerun()
+            else:
+                st.error("Sai tên đăng nhập hoặc mật khẩu!")
+    st.stop()
 
-# 2. Tạo các Tab chức năng
-tab1, tab2, tab3 = st.tabs(["📊 Báo Cáo Tồn Kho", "📤 Xuất Kho Combo (BOM)", "📋 Định Mức BOM"])
+# --- PHẦN 3: GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP ---
+st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
+if st.sidebar.button("Đăng xuất"):
+    st.session_state.logged_in = False
+    st.session_state.role = None
+    st.rerun()
 
-with tab1:
-    st.subheader("Bảng Báo Cáo Tồn Kho Hiện Tại")
-    data = []
-    for ma_lk, info in st.session_state.kho.items():
-        ton_cuoi = info["ton_dau"] + info["nhap"] - info["xuat"]
-        data.append({
-            "Mã Linh Kiện": ma_lk,
-            "Tên Linh Kiện": info["ten"],
-            "Tồn Đầu": info["ton_dau"],
-            "Tổng Nhập": info["nhap"],
-            "Tổng Xuất": info["xuat"],
-            "Tồn Cuối Kỳ": ton_cuoi
-        })
-    df = pd.DataFrame(data)
+st.title("📦 QUẢN LÝ KHO LINH KIỆN VĨNH VIỄN")
+
+# Đọc dữ liệu từ Google Sheets
+data = worksheet.get_all_records()
+df = pd.DataFrame(data)
+
+st.subheader("📊 Bảng Tồn Kho Hiện Tại")
+if not df.empty:
     st.dataframe(df, use_container_width=True)
+else:
+    st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
 
-with tab2:
-    st.subheader("Thực Hiện Xuất Kho Theo Mã Combo")
+# Form nhập liệu (Dành cho cả Admin và Nhân viên)
+st.subheader("➕ Thêm / Nhập Kho Linh Kiện Mới")
+with st.form("add_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
     with col1:
-        combo_chon = st.selectbox("Chọn Mã Combo Xuất Kho:", list(dinh_muc_combo.keys()))
-        so_luong_xuat = st.number_input("Số Lượng Combo Xuất:", min_value=1, value=1, step=1)
-        
-        if st.button("🚀 Thực Hiện Trừ Kho BOM"):
-            for item in dinh_muc_combo[combo_chon]:
-                ma_lk = item["ma_lk"]
-                sl_tru = item["so_luong"] * so_luong_xuat
-                st.session_state.kho[ma_lk]["xuat"] += sl_tru
-            st.success(f"Đã xuất thành công {so_luong_xuat} bộ {combo_chon} và tự động trừ kho linh kiện lẻ!")
-
-with tab3:
-    st.subheader("Chi Tiết Định Mức BOM")
-    for combo, ds in dinh_muc_combo.items():
-        st.write(f"**Combo: {combo}**")
-        st.table(pd.DataFrame(ds))
+        ma_lk = st.text_input("Mã linh kiện")
+        ten_lk = st.text_input("Tên linh kiện")
+    with col2:
+        so_luong = st.number_input("Số lượng", min_value=0, step=1)
+        don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Mét...)")
+    
+    submitted = st.form_submit_button("Lưu dữ liệu vào Google Sheets")
+    if submitted:
+        if ma_lk and ten_lk:
+            # Ghi dòng mới trực tiếp vào Google Sheet
+            worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi])
+            st.success("Đã lưu dữ liệu thành công lên Google Sheets vĩnh viễn!")
+            st.rerun()
+        else:
+            st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
