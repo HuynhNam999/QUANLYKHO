@@ -2,18 +2,28 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import json
 
-# --- KẾT NỐI GOOGLE SHEETS TỪ FILE JSON TRÊN GITHUB ---
+# --- CẤU HÌNH KẾT NỐI TRỰC TIẾP AN TOÀN ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
-    # Mở và đọc trực tiếp file service_account.json trên GitHub
-    with open("service_account.json", "r", encoding="utf-8") as f:
-        creds_info = json.load(f)
-        
-    credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
+    # Nhúng trực tiếp thông tin Service Account vào đây để tránh mọi lỗi file trên GitHub
+    creds_dict = {
+        "type": "service_account",
+        "project_id": "abiding-rhythm-513703-v6",
+        "private_key_id": "04180b71b35af852b3de169d59546bc4f7f38",
+        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7V004... (dán toàn bộ private_key chuẩn của bạn vào đây, giữ nguyên các ký tự \n)\n-----END PRIVATE KEY-----\n",
+        "client_email": "huynhnam@abiding-rhythm-513703-v6.iam.gserviceaccount.com",
+        "client_id": "115693946597021386582",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/huynhnam%40abiding-rhythm-513703-v6.iam.gserviceaccount.com",
+        "universe_domain": "googleapis.com"
+    }
+    
+    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(credentials)
 
 try:
