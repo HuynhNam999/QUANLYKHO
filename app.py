@@ -3,16 +3,11 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-# --- KẾT NỐI GOOGLE SHEETS TỪ SECRETS AN TOÀN ---
+# --- KẾT NỐI GOOGLE SHEETS TRỰC TIẾP TỪ FILE JSON TRÊN GITHUB ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    sec = st.secrets["gcp_service_account"]
-    creds_dict = dict(sec)
-    if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        
-    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    credentials = Credentials.from_service_account_file("service_account.json", scopes=scopes)
     return gspread.authorize(credentials)
 
 try:
@@ -29,7 +24,7 @@ if "logged_in" not in st.session_state:
     st.session_state.role = None
 
 if not st.session_state.logged_in:
-    st.title(" ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ KHO")
+    st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ KHO")
     with st.form("login_form"):
         username = st.text_input("Tên đăng nhập")
         password = st.text_input("Mật khẩu", type="password")
@@ -51,24 +46,24 @@ if not st.session_state.logged_in:
     st.stop()
 
 # --- GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP ---
-st.sidebar.title(f" Xin chào: {st.session_state.role}")
+st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
     st.session_state.logged_in = False
     st.session_state.role = None
     st.rerun()
 
-st.title(" QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
+st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
 
 # Đọc dữ liệu từ Google Sheets
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 
-st.subheader(" Bảng Tồn Kho & Chi Tiết")
+st.subheader("📊 Bảng Tồn Kho & Chi Tiết")
 if not df.empty:
     st.dataframe(df, use_container_width=True)
     
     st.markdown("---")
-    st.subheader(" Tra cứu chi tiết linh kiện / combo")
+    st.subheader("🔍 Tra cứu chi tiết linh kiện / combo")
     selected_item = st.selectbox("Chọn mã linh kiện để xem ảnh & nhật ký", df.iloc[:, 0].tolist() if len(df.columns) > 0 else [])
     
     if selected_item:
@@ -92,7 +87,7 @@ else:
 
 # Form nhập liệu
 st.markdown("---")
-st.subheader(" Thêm / Cập Nhật Linh Kiện & Combo Mới")
+st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
 with st.form("add_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
     with col1:
