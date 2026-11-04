@@ -73,11 +73,4 @@ if not df.empty:
     selected_item = st.selectbox("Chọn mã linh kiện để xem ảnh & nhật ký", df.iloc[:, 0].tolist() if len(df.columns) > 0 else [])
     
     if selected_item:
-        item_row = df[df.iloc[:, 0] == selected_item].iloc[0]
-        col_info1, col_info2 = st.columns(2)
-        
-        with col_info1:
-            st.write(f"**Mã LK:** {item_row.get(df.columns[0], '')}")
-            st.write(f"**Tên LK:** {item_row.get(df.columns[1], '')}")
-            st.write(f"**Số lượng tồn:** {item_row.get(df.columns[2], '')} {item_row.get(df.columns[3], '')}")
-            st.write(f"**📝 Nhật ký xuất nhập:** {item_row.get('NhatKyXuatNhap', 'Chưa có nhật
+        item
