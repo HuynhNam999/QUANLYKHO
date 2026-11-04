@@ -2,32 +2,21 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import json
 
-# --- KẾT NỐI GOOGLE SHEETS AN TOÀN TỪ SECRETS ---
+# --- KẾT NỐI GOOGLE SHEETS TỪ SECRETS AN TOÀN TUỆT ĐỐI ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
-    # Lấy trực tiếp thông tin bảo mật từ Secrets của Streamlit
+    # Lấy thông tin từ st.secrets và chuyển đổi sang dạng dict an toàn
     sec = st.secrets["gcp_service_account"]
     
-    # Xử lý làm sạch định dạng chuỗi xuống dòng của khóa
-    private_key = sec["private_key"].replace("\\n", "\n")
-    
-    creds_dict = {
-        "type": sec["type"],
-        "project_id": sec["project_id"],
-        "private_key_id": sec["private_key_id"],
-        "private_key": private_key,
-        "client_email": sec["client_email"],
-        "client_id": sec["client_id"],
-        "auth_uri": sec["auth_uri"],
-        "token_uri": sec["token_uri"],
-        "auth_provider_x509_cert_url": sec["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": sec["client_x509_cert_url"],
-        "universe_domain": sec.get("universe_domain", "googleapis.com")
-    }
-    
+    creds_dict = dict(sec)
+    # Xử lý triệt để lỗi định dạng private_key xuống dòng
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
     credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(credentials)
 
@@ -100,31 +89,3 @@ if not df.empty:
         with col_info2:
             img_url = item_row.get('HinhAnh', '')
             if img_url and str(img_url).startswith("http"):
-                st.image(img_url, caption=f"Ảnh: {item_row.get(df.columns[1], '')}", width=250)
-            else:
-                st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
-else:
-    st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
-
-# Form nhập liệu
-st.markdown("---")
-st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
-with st.form("add_form", clear_on_submit=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        ma_lk = st.text_input("Mã linh kiện / Combo")
-        ten_lk = st.text_input("Tên linh kiện / Combo")
-        so_luong = st.number_input("Số lượng", min_value=0, step=1)
-    with col2:
-        don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Combo...)")
-        nhat_ky = st.text_input("Nhật ký xuất nhập")
-        hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
-    
-    submitted = st.form_submit_button("Lưu dữ liệu vào Google Sheets")
-    if submitted:
-        if ma_lk and ten_lk:
-            worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi, nhat_ky, hinh_anh])
-            st.success("Đã lưu dữ liệu thành công lên Google Sheets vĩnh viễn!")
-            st.rerun()
-        else:
-            st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
