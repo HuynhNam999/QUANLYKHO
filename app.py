@@ -3,32 +3,12 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-# --- PHẦN 1: KẾT NỐI GOOGLE SHEETS TRỰC TIẾP TỪ SECRETS ---
+# --- KẾT NỐI GOOGLE SHEETS TRỰC TIẾP TỪ FILE JSON TRÊN GITHUB ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    
-    # Lấy trực tiếp thông tin từ secrets
-    sec = st.secrets["gcp_service_account"]
-    
-    # Xử lý làm sạch private_key tránh lỗi định dạng PEM
-    private_key = sec["private_key"].replace("\\n", "\n")
-    
-    creds_dict = {
-        "type": sec["type"],
-        "project_id": sec["project_id"],
-        "private_key_id": sec["private_key_id"],
-        "private_key": private_key,
-        "client_email": sec["client_email"],
-        "client_id": sec["client_id"],
-        "auth_uri": sec["auth_uri"],
-        "token_uri": sec["token_uri"],
-        "auth_provider_x509_cert_url": sec["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": sec["client_x509_cert_url"],
-        "universe_domain": sec.get("universe_domain", "googleapis.com")
-    }
-    
-    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    # Đọc trực tiếp từ file service_account.json trong thư mục dự án
+    credentials = Credentials.from_service_account_file("service_account.json", scopes=scopes)
     return gspread.authorize(credentials)
 
 try:
@@ -36,10 +16,10 @@ try:
     sh = gc.open("QuanLyKho")
     worksheet = sh.worksheet("TonKho")
 except Exception as e:
-    st.error(f"Lỗi kết nối Google Sheets: Check lại tên file 'QuanLyKho' hoặc quyền Share email Bot! Chi tiết: {e}")
+    st.error(f"Lỗi kết nối Google Sheets: Hãy kiểm tra lại tên file 'QuanLyKho' hoặc quyền Share email Bot! Chi tiết: {e}")
     st.stop()
 
-# --- PHẦN 2: HỆ THỐNG ĐĂNG NHẬP PHÂN QUYỀN ---
+# --- HỆ THỐNG ĐĂNG NHẬP PHÂN QUYỀN ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
@@ -66,7 +46,7 @@ if not st.session_state.logged_in:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
 
-# --- PHẦN 3: GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP ---
+# --- GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
     st.session_state.logged_in = False
