@@ -2,15 +2,18 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import json
 
+# --- KẾT NỐI GOOGLE SHEETS TỪ FILE JSON TRÊN GITHUB ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    sec = st.secrets["gcp_service_account"]
-    creds_dict = dict(sec)
-    if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    
+    # Mở và đọc trực tiếp file service_account.json trên GitHub
+    with open("service_account.json", "r", encoding="utf-8") as f:
+        creds_info = json.load(f)
+        
+    credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
     return gspread.authorize(credentials)
 
 try:
@@ -48,6 +51,7 @@ if not st.session_state.logged_in:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
 
+# --- GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
     st.session_state.logged_in = False
@@ -56,6 +60,7 @@ if st.sidebar.button("Đăng xuất"):
 
 st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
 
+# Đọc dữ liệu từ Google Sheets
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 
@@ -86,6 +91,7 @@ if not df.empty:
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
 
+# Form nhập liệu
 st.markdown("---")
 st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
 with st.form("add_form", clear_on_submit=True):
