@@ -2,14 +2,13 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import json
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    # Đọc trực tiếp file JSON chuẩn có sẵn trong kho GitHub
-    with open("service_account.json", "r", encoding="utf-8") as f:
-        creds_info = json.load(f)
-    return gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=scopes))
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    return gspread.authorize(Credentials.from_service_account_info(creds_dict, scopes=scopes))
 try:
     gc = init_connection()
     worksheet = gc.open("QuanLyKho").worksheet("TonKho")
