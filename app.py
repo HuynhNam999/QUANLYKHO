@@ -3,14 +3,32 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-# --- PHẦN 1: KẾT NỐI GOOGLE SHEETS TỪ SECRETS ---
+# --- PHẦN 1: KẾT NỐI GOOGLE SHEETS TRỰC TIẾP TỪ SECRETS ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    credentials = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
-    )
+    
+    # Lấy trực tiếp thông tin từ secrets
+    sec = st.secrets["gcp_service_account"]
+    
+    # Xử lý làm sạch private_key tránh lỗi định dạng PEM
+    private_key = sec["private_key"].replace("\\n", "\n")
+    
+    creds_dict = {
+        "type": sec["type"],
+        "project_id": sec["project_id"],
+        "private_key_id": sec["private_key_id"],
+        "private_key": private_key,
+        "client_email": sec["client_email"],
+        "client_id": sec["client_id"],
+        "auth_uri": sec["auth_uri"],
+        "token_uri": sec["token_uri"],
+        "auth_provider_x509_cert_url": sec["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": sec["client_x509_cert_url"],
+        "universe_domain": sec.get("universe_domain", "googleapis.com")
+    }
+    
+    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(credentials)
 
 try:
