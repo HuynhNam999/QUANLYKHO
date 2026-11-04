@@ -2,18 +2,14 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import json
 
-# --- KẾT NỐI GOOGLE SHEETS TỪ SECRETS AN TOÀN TUỆT ĐỐI ---
+# --- KẾT NỐI GOOGLE SHEETS TỪ SECRETS AN TOÀN TUYỆT ĐỐI ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
-    # Lấy thông tin từ st.secrets và chuyển đổi sang dạng dict an toàn
     sec = st.secrets["gcp_service_account"]
-    
     creds_dict = dict(sec)
-    # Xử lý triệt để lỗi định dạng private_key xuống dòng
     if "private_key" in creds_dict:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
@@ -84,8 +80,4 @@ if not df.empty:
             st.write(f"**Mã LK:** {item_row.get(df.columns[0], '')}")
             st.write(f"**Tên LK:** {item_row.get(df.columns[1], '')}")
             st.write(f"**Số lượng tồn:** {item_row.get(df.columns[2], '')} {item_row.get(df.columns[3], '')}")
-            st.write(f"**📝 Nhật ký xuất nhập:** {item_row.get('NhatKyXuatNhap', 'Chưa có nhật ký')}")
-            
-        with col_info2:
-            img_url = item_row.get('HinhAnh', '')
-            if img_url and str(img_url).startswith("http"):
+            st.write(f"**📝 Nhật ký xuất nhập:** {item_row.get('NhatKyXuatNhap', 'Chưa có nhật
