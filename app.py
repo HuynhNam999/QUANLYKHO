@@ -3,11 +3,10 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-# --- KẾT NỐI GOOGLE SHEETS TRỰC TIẾP TỪ FILE JSON TRÊN GITHUB ---
+# --- KẾT NỐI GOOGLE SHEETS TỪ FILE JSON TRÊN GITHUB ---
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    # Đọc trực tiếp từ file service_account.json trong thư mục dự án
     credentials = Credentials.from_service_account_file("service_account.json", scopes=scopes)
     return gspread.authorize(credentials)
 
@@ -53,34 +52,61 @@ if st.sidebar.button("Đăng xuất"):
     st.session_state.role = None
     st.rerun()
 
-st.title("📦 QUẢN LÝ KHO LINH KIỆN VĨNH VIỄN")
+st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
 
 # Đọc dữ liệu từ Google Sheets
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 
-st.subheader("📊 Bảng Tồn Kho Hiện Tại")
+st.subheader("📊 Bảng Tồn Kho & Chi Tiết")
 if not df.empty:
+    # Hiển thị bảng dữ liệu cơ bản
     st.dataframe(df, use_container_width=True)
+    
+    # Khu vực xem nhanh chi tiết linh kiện / hình ảnh / nhật ký
+    st.markdown("---")
+    st.subheader("🔍 Tra cứu chi tiết linh kiện / combo")
+    selected_item = st.selectbox("Chọn mã linh kiện để xem ảnh & nhật ký", df.iloc[:, 0].tolist() if len(df.columns) > 0 else [])
+    
+    if selected_item:
+        item_row = df[df.iloc[:, 0] == selected_item].iloc[0]
+        col_info1, col_info2 = st.columns(2)
+        
+        with col_info1:
+            st.write(f"**Mã LK:** {item_row.get(df.columns[0], '')}")
+            st.write(f"**Tên LK:** {item_row.get(df.columns[1], '')}")
+            st.write(f"**Số lượng tồn:** {item_row.get(df.columns[2], '')} {item_row.get(df.columns[3], '')}")
+            st.write(f"**📝 Nhật ký xuất nhập gần nhất:** {item_row.get('NhatKyXuatNhap', 'Chưa có nhật ký')}")
+            
+        with col_info2:
+            img_url = item_row.get('HinhAnh', '')
+            if img_url and str(img_url).startswith("http"):
+                st.image(img_url, caption=f"Ảnh: {item_row.get(df.columns[1], '')}", width=250)
+            else:
+                st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
 
-# Form nhập liệu
-st.subheader("➕ Thêm / Nhập Kho Linh Kiện Mới")
+# Form nhập liệu mới (có thêm Nhật ký & Link ảnh)
+st.markdown("---")
+st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
 with st.form("add_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
     with col1:
-        ma_lk = st.text_input("Mã linh kiện")
-        ten_lk = st.text_input("Tên linh kiện")
-    with col2:
+        ma_lk = st.text_input("Mã linh kiện / Combo")
+        ten_lk = st.text_input("Tên linh kiện / Combo")
         so_luong = st.number_input("Số lượng", min_value=0, step=1)
-        don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Mét...)")
+    with col2:
+        don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Combo...)")
+        nhat_ky = st.text_input("Nhật ký xuất nhập (VD: Nhập mới kho A / Xuất cho dự án X)")
+        hinh_anh = st.text_input("Link ảnh chi tiết (Dán URL hình ảnh công khai)")
     
     submitted = st.form_submit_button("Lưu dữ liệu vào Google Sheets")
     if submitted:
         if ma_lk and ten_lk:
-            worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi])
-            st.success("Đã lưu dữ liệu thành công lên Google Sheets vĩnh viễn!")
+            # Lưu theo đúng thứ tự các cột: [Mã, Tên, Số lượng, Đơn vị, Nhật ký, Hình ảnh]
+            worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi, nhat_ky, hinh_anh])
+            st.success("Đã lưu dữ liệu và nhật ký thành công lên Google Sheets vĩnh viễn!")
             st.rerun()
         else:
             st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
