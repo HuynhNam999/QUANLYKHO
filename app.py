@@ -322,7 +322,7 @@ with main_col:
                         st.error(f"Lỗi khi lưu dữ liệu: {e}")
                 else:
                     st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện/vật tư!")
-    # 5. XÉ LẺ COMBO THÀNH LINH KIỆN (Tính năng mới giúp tự động bóc tách bộ Combo ra bán lẻ)
+    # 5. XÉ LẺ COMBO THÀNH LINH KIỆN
     elif menu_choice == "🔄 Xé lẻ Combo thành Linh kiện":
         st.title("🔄 XÉ LẺ COMBO THÀNH LINH KIỆN (Kit Breaking)")
         st.markdown("---")
@@ -356,7 +356,6 @@ with main_col:
                             try:
                                 ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                                 nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                                # 1. Trừ số lượng bộ Combo
                                 cb_ton_moi = cb_ton - int(so_luong_xe)
                                 cb_log_moi = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 🔄 Xé lẻ: -{so_luong_xe} {cb_dv} | Ghi chú: {noi_dung_xe}"
                                 old_cb_logs = cb_row.get("Nhat_ky", "")
@@ -366,7 +365,6 @@ with main_col:
                                     "So_luong": cb_ton_moi,
                                     "Nhat_ky": cb_log_moi
                                 }).eq("Ma_LK", selected_cb_ma).execute()
-                                # 2. Cộng tương ứng số lượng linh kiện con vào kho lẻ
                                 for tp in cb_tp:
                                     sub_m = tp.get('ma')
                                     sub_sl_tang = int(tp.get('sl', 1)) * int(so_luong_xe)
@@ -393,7 +391,6 @@ with main_col:
                                             "Thanh_phan": sub_tp_con
                                         }).execute()
                                     else:
-                                        # Nếu linh kiện con chưa có dòng độc lập trong DB, tạo mới luôn
                                         sub_log_moi = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - ➕ Nhận từ xé lẻ Combo '{selected_cb_ma}': +{sub_sl_tang} Cái"
                                         supabase.table("Ton_kho").upsert({
                                             "Ma_LK": sub_m,
@@ -492,22 +489,50 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 7. XUẤT KHO LINH KIỆN LẺ
+    # 7. XUẤT KHO LINH KIỆN LẺ (Hiển thị đầy đủ mọi linh kiện và tự động khởi tạo dữ liệu nếu chưa có)
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
-        st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập)")
+        st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập & Thành phần)")
         st.markdown("---")
         if not df.empty:
-            item_df = df[df["Ma_LK"].str.startswith(("LK", "VT"), na=False)]
-            if not item_df.empty:
-                export_options = [f"{row['Ma_LK']} - {row['Ten_LK']}" for _, row in item_df.iterrows()]
+            all_items_dict = {}
+            for _, row in df.iterrows():
+                m = row["Ma_LK"]
+                t = row["Ten_LK"]
+                dv = row["Don_vi"]
+                sl = row["So_luong"]
+                img = row.get("Hinh_anh", "")
+                if not m.startswith("CB"):
+                    if m not in all_items_dict:
+                        all_items_dict[m] = {"Ten_LK": t, "So_luong": sl, "Don_vi": dv, "Hinh_anh": img}
+                tp_list = row.get("Thanh_phan", [])
+                if tp_list and isinstance(tp_list, list):
+                    for tp in tp_list:
+                        sub_m = tp.get("ma")
+                        if sub_m and not sub_m.startswith("CB") and sub_m not in all_items_dict:
+                            sub_match = df[df["Ma_LK"] == sub_m]
+                            if not sub_match.empty:
+                                all_items_dict[sub_m] = {
+                                    "Ten_LK": sub_match.iloc[0]["Ten_LK"],
+                                    "So_luong": sub_match.iloc[0]["So_luong"],
+                                    "Don_vi": sub_match.iloc[0]["Don_vi"],
+                                    "Hinh_anh": sub_match.iloc[0].get("Hinh_anh", "")
+                                }
+                            else:
+                                all_items_dict[sub_m] = {
+                                    "Ten_LK": f"Linh kiện thành phần ({sub_m})",
+                                    "So_luong": 0,
+                                    "Don_vi": "Cái",
+                                    "Hinh_anh": tp.get("img", "")
+                                }
+            export_options = [f"{m} - {info['Ten_LK']}" for m, info in all_items_dict.items()]
+            if export_options:
                 selected_export_opt = st.selectbox("1️⃣ Chọn linh kiện / vật tư cần xuất kho", export_options)
                 selected_export_item = selected_export_opt.split(" - ")[0]
-                current_item_row = df[df["Ma_LK"] == selected_export_item].iloc[0]
-                hien_thi_ten = current_item_row["Ten_LK"]
-                ton_hien_tai = current_item_row["So_luong"]
-                don_vi_tinh = current_item_row["Don_vi"]
-                hinh_anh_cu = current_item_row["Hinh_anh"]
-                thanh_phan_list = current_item_row.get("Thanh_phan", [])
+                current_info = all_items_dict[selected_export_item]
+                hien_thi_ten = current_info["Ten_LK"]
+                ton_hien_tai = current_info["So_luong"]
+                don_vi_tinh = current_info["Don_vi"]
+                hinh_anh_cu = current_info["Hinh_anh"]
                 st.warning(f"🔩 **Linh kiện/Vật tư chọn:** {hien_thi_ten} (`{selected_export_item}`) | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}**")
                 with st.form("export_item_form", clear_on_submit=True):
                     col_ex1, col_ex2 = st.columns(2)
@@ -525,6 +550,14 @@ with main_col:
                             nhat_ky_xuat = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📤 Xuất lẻ: {so_luong_xuat} {don_vi_tinh}"
                             if noi_dung_xuat:
                                 nhat_ky_xuat += f" | Nội dung: {noi_dung_xuat}"
+                            check_exist = df[df["Ma_LK"] == selected_export_item]
+                            if not check_exist.empty:
+                                old_logs = check_exist.iloc[0].get("Nhat_ky", "")
+                                if old_logs:
+                                    nhat_ky_xuat = old_logs + "\n" + nhat_ky_xuat
+                                old_tp = check_exist.iloc[0].get("Thanh_phan", [])
+                            else:
+                                old_tp = []
                             update_data = {
                                 "Ma_LK": selected_export_item,
                                 "Ten_LK": hien_thi_ten,
@@ -532,14 +565,15 @@ with main_col:
                                 "Don_vi": don_vi_tinh,
                                 "Nhat_ky": nhat_ky_xuat,
                                 "Hinh_anh": hinh_anh_cu,
-                                "Thanh_phan": thanh_phan_list
+                                "Thanh_phan": old_tp
                             }
+                            # Dùng upsert để nếu chưa có dòng trong DB thì hệ thống tự động tạo mới bản ghi với số lượng âm/mới
                             supabase.table("Ton_kho").upsert(update_data).execute()
                             st.success(f"Xuất linh kiện/vật tư lẻ thành công! Tồn kho mới còn lại: {so_luong_moi} {don_vi_tinh}")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Lỗi khi thực hiện xuất kho: {e}")
             else:
-                st.warning("Hiện chưa có mã linh kiện/vật tư lẻ (LK hoặc VT) nào trong hệ thống!")
+                st.warning("Hiện chưa có mã linh kiện/vật tư nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
