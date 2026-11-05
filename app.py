@@ -164,18 +164,19 @@ with main_col:
             code_map = {}
             if not df.empty:
                 for _, row in df.iterrows():
-                    display_str = f"[{row['Ma_LK']}] - {row['Ten_LK']}"
+                    # Hiển thị tường minh dạng: Mã linh kiện - Tên linh kiện
+                    display_str = f"{row['Ma_LK']} - {row['Ten_LK']}"
                     options_list.append(display_str)
                     code_map[display_str] = row['Ma_LK']
             sub_col1, sub_col2, sub_col3 = st.columns(3)
             with sub_col1:
-                tp1_opt = st.selectbox("Thành phần 1", options_list, key="tp1_o")
+                tp1_opt = st.selectbox("Thành phần 1 (Mã & Tên)", options_list, key="tp1_o")
                 tp1_sl = st.number_input("Số lượng dùng trong 1 bộ", min_value=1, value=1, key="tp1_s")
             with sub_col2:
-                tp2_opt = st.selectbox("Thành phần 2", options_list, key="tp2_o")
+                tp2_opt = st.selectbox("Thành phần 2 (Mã & Tên)", options_list, key="tp2_o")
                 tp2_sl = st.number_input("Số lượng dùng trong 1 bộ ", min_value=1, value=1, key="tp2_s")
             with sub_col3:
-                tp3_opt = st.selectbox("Thành phần 3", options_list, key="tp3_o")
+                tp3_opt = st.selectbox("Thành phần 3 (Mã & Tên)", options_list, key="tp3_o")
                 tp3_sl = st.number_input("Số lượng dùng trong 1 bộ  ", min_value=1, value=1, key="tp3_s")
             save_btn = st.form_submit_button("Lưu dữ liệu vào Database")
             if save_btn:
@@ -213,9 +214,9 @@ with main_col:
         st.markdown("---")
         st.info("💡 Bạn có thể chọn bất kỳ mã nào trong kho để xuất: **Xuất Combo** (tự động trừ kèm linh kiện con) hoặc **Xuất lẻ linh kiện thành phần độc lập** tùy ý.")
         if not df.empty:
-            export_options = [f"[{row['Ma_LK']}] - {row['Ten_LK']}" for _, row in df.iterrows()]
+            export_options = [f"{row['Ma_LK']} - {row['Ten_LK']}" for _, row in df.iterrows()]
             selected_export_opt = st.selectbox("1️⃣ Chọn sản phẩm / linh kiện cần xuất kho", export_options)
-            selected_export_item = selected_export_opt.split("]")[0].replace("[", "")
+            selected_export_item = selected_export_opt.split(" - ")[0]
             current_item_row = df[df["Ma_LK"] == selected_export_item].iloc[0]
             hien_thi_ten = current_item_row["Ten_LK"]
             ton_hien_tai = current_item_row["So_luong"]
