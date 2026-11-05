@@ -119,7 +119,7 @@ with main_col:
                             sub_m = tp.get('ma')
                             sub_sl = tp.get('sl')
                             sub_match = df[df["Ma_LK"] == sub_m]
-                            sub_name = sub_match.iloc[0]["Ten_LK"] if not sub_match.empty else "Linh kiện ngoài hệ thống"
+                            sub_name = sub_match.iloc[0]["Ten_LK"] if not sub_match.empty else ""
                             st.write(f"- `{sub_m}` ({sub_name}) | Định mức trong bộ: **{sub_sl}**")
                 with col_info2:
                     img_url = item_row.get('Hinh_anh', '')
@@ -147,7 +147,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Cho phép gõ trực tiếp mã linh kiện/vật tư ở phần 2)
+    # 3. NHẬP MỚI COMBO (Phần 2 chọn từ danh sách có sẵn để tuyệt đối khớp Mã và Tên)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
         st.markdown("---")
@@ -164,52 +164,59 @@ with main_col:
                 hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
             ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập kho bộ combo mới")
             st.markdown("---")
-            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Nhập trực tiếp mã LK/VT)")
-            st.info("💡 Bạn có thể tự do gõ mã linh kiện hoặc vật tư (bắt đầu bằng LK hoặc VT, ví dụ: `LK-CANHQUAT-01`) vào các ô bên dưới mà không bắt buộc phải chọn từ danh sách.")
-            # Dùng text_input để bạn tự do gõ mã linh kiện/vật tư tùy ý
+            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Chọn chính xác từ danh sách LK/VT đã có)")
+            st.info("💡 Hệ thống tự động gợi ý danh sách mã và tên linh kiện/vật tư đã khai báo trước đó để tránh việc gõ sai tên lệch mã.")
+            options_list = ["Không chọn"]
+            code_map = {}
+            if not df.empty:
+                for _, row in df.iterrows():
+                    display_str = f"{row['Ma_LK']} - {row['Ten_LK']}"
+                    options_list.append(display_str)
+                    code_map[display_str] = row['Ma_LK']
+            # 10 linh kiện / vật tư thành phần (Chọn từ selectbox để đồng bộ tuyệt đối mã và tên)
             sc1, sc2 = st.columns(2)
             with sc1:
-                tp1_ma = st.text_input("Mã Thành phần 1 (VD: LK-CANHQUAT-01)", key="tp1_m")
+                tp1_opt = st.selectbox("Thành phần 1 (Chọn LK/VT)", options_list, key="tp1_o")
                 tp1_sl = st.number_input("Định mức SL thành phần 1", min_value=1, value=1, key="tp1_s")
             with sc2:
-                tp2_ma = st.text_input("Mã Thành phần 2", key="tp2_m")
+                tp2_opt = st.selectbox("Thành phần 2 (Chọn LK/VT)", options_list, key="tp2_o")
                 tp2_sl = st.number_input("Định mức SL thành phần 2", min_value=1, value=1, key="tp2_s")
             sc3, sc4 = st.columns(2)
             with sc3:
-                tp3_ma = st.text_input("Mã Thành phần 3", key="tp3_m")
+                tp3_opt = st.selectbox("Thành phần 3 (Chọn LK/VT)", options_list, key="tp3_o")
                 tp3_sl = st.number_input("Định mức SL thành phần 3", min_value=1, value=1, key="tp3_s")
             with sc4:
-                tp4_ma = st.text_input("Mã Thành phần 4", key="tp4_m")
+                tp4_opt = st.selectbox("Thành phần 4 (Chọn LK/VT)", options_list, key="tp4_o")
                 tp4_sl = st.number_input("Định mức SL thành phần 4", min_value=1, value=1, key="tp4_s")
             sc5, sc6 = st.columns(2)
             with sc5:
-                tp5_ma = st.text_input("Mã Thành phần 5", key="tp5_m")
+                tp5_opt = st.selectbox("Thành phần 5 (Chọn LK/VT)", options_list, key="tp5_o")
                 tp5_sl = st.number_input("Định mức SL thành phần 5", min_value=1, value=1, key="tp5_s")
             with sc6:
-                tp6_ma = st.text_input("Mã Thành phần 6", key="tp6_m")
+                tp6_opt = st.selectbox("Thành phần 6 (Chọn LK/VT)", options_list, key="tp6_o")
                 tp6_sl = st.number_input("Định mức SL thành phần 6", min_value=1, value=1, key="tp6_s")
             sc7, sc8 = st.columns(2)
             with sc7:
-                tp7_ma = st.text_input("Mã Thành phần 7", key="tp7_m")
+                tp7_opt = st.selectbox("Thành phần 7 (Chọn LK/VT)", options_list, key="tp7_o")
                 tp7_sl = st.number_input("Định mức SL thành phần 7", min_value=1, value=1, key="tp7_s")
             with sc8:
-                tp8_ma = st.text_input("Mã Thành phần 8", key="tp8_m")
+                tp8_opt = st.selectbox("Thành phần 8 (Chọn LK/VT)", options_list, key="tp8_o")
                 tp8_sl = st.number_input("Định mức SL thành phần 8", min_value=1, value=1, key="tp8_s")
             sc9, sc10 = st.columns(2)
             with sc9:
-                tp9_ma = st.text_input("Mã Thành phần 9", key="tp9_m")
+                tp9_opt = st.selectbox("Thành phần 9 (Chọn LK/VT)", options_list, key="tp9_o")
                 tp9_sl = st.number_input("Định mức SL thành phần 9", min_value=1, value=1, key="tp9_s")
             with sc10:
-                tp10_ma = st.text_input("Mã Thành phần 10", key="tp10_m")
+                tp10_opt = st.selectbox("Thành phần 10 (Chọn LK/VT)", options_list, key="tp10_o")
                 tp10_sl = st.number_input("Định mức SL thành phần 10", min_value=1, value=1, key="tp10_s")
             danh_sach_thanh_phan = []
-            tps_input = [
-                (tp1_ma, tp1_sl), (tp2_ma, tp2_sl), (tp3_ma, tp3_sl), (tp4_ma, tp4_sl), (tp5_ma, tp5_sl),
-                (tp6_ma, tp6_sl), (tp7_ma, tp7_sl), (tp8_ma, tp8_sl), (tp9_ma, tp9_sl), (tp10_ma, tp10_sl)
+            tps = [
+                (tp1_opt, tp1_sl), (tp2_opt, tp2_sl), (tp3_opt, tp3_sl), (tp4_opt, tp4_sl), (tp5_opt, tp5_sl),
+                (tp6_opt, tp6_sl), (tp7_opt, tp7_sl), (tp8_opt, tp8_sl), (tp9_opt, tp9_sl), (tp10_opt, tp10_sl)
             ]
-            for ma_con, sl in tps_input:
-                if ma_con and ma_con.strip() != "":
-                    danh_sach_thanh_phan.append({"ma": ma_con.strip(), "sl": int(sl)})
+            for opt, sl in tps:
+                if opt != "Không chọn":
+                    danh_sach_thanh_phan.append({"ma": code_map[opt], "sl": int(sl)})
             save_btn = st.form_submit_button("💾 Lưu Combo vào Database")
             if save_btn:
                 if ma_lk and ten_lk:
