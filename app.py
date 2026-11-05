@@ -489,7 +489,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 7. XUẤT KHO LINH KIỆN LẺ (Hiển thị đầy đủ mọi linh kiện và tự động khởi tạo dữ liệu nếu chưa có)
+    # 7. XUẤT KHO LINH KIỆN LẺ (Tự động bóc tách tìm bộ Combo chứa linh kiện này để tự động trừ số lượng bộ Combo tương ứng)
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
         st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập & Thành phần)")
         st.markdown("---")
@@ -501,6 +501,7 @@ with main_col:
                 dv = row["Don_vi"]
                 sl = row["So_luong"]
                 img = row.get("Hinh_anh", "")
+                # Thu thập tất cả mã không phải tiền tố CB (hoặc quét linh kiện con)
                 if not m.startswith("CB"):
                     if m not in all_items_dict:
                         all_items_dict[m] = {"Ten_LK": t, "So_luong": sl, "Don_vi": dv, "Hinh_anh": img}
@@ -550,6 +551,7 @@ with main_col:
                             nhat_ky_xuat = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📤 Xuất lẻ: {so_luong_xuat} {don_vi_tinh}"
                             if noi_dung_xuat:
                                 nhat_ky_xuat += f" | Nội dung: {noi_dung_xuat}"
+                            # 1. Cập nhật tồn kho của chính linh kiện đó
                             check_exist = df[df["Ma_LK"] == selected_export_item]
                             if not check_exist.empty:
                                 old_logs = check_exist.iloc[0].get("Nhat_ky", "")
@@ -567,9 +569,29 @@ with main_col:
                                 "Hinh_anh": hinh_anh_cu,
                                 "Thanh_phan": old_tp
                             }
-                            # Dùng upsert để nếu chưa có dòng trong DB thì hệ thống tự động tạo mới bản ghi với số lượng âm/mới
                             supabase.table("Ton_kho").upsert(update_data).execute()
-                            st.success(f"Xuất linh kiện/vật tư lẻ thành công! Tồn kho mới còn lại: {so_luong_moi} {don_vi_tinh}")
+                            # 2. TỰ ĐỘNG QUÉT VÀ TRỪ SỐ LƯỢNG BỘ COMBO CHỨA LINH KIỆN NÀY
+                            for _, combo_row in df[df["Ma_LK"].str.startswith("CB", na=False) | df["Ma_LK"].str.startswith("CM", na=False)].iterrows():
+                                cb_ma = combo_row["Ma_LK"]
+                                cb_tp_list = combo_row.get("Thanh_phan", [])
+                                if cb_tp_list and isinstance(cb_tp_list, list):
+                                    for tp in cb_tp_list:
+                                        if tp.get("ma") == selected_export_item:
+                                            dinh_muc = int(tp.get("sl", 1))
+                                            # Tính số bộ combo bị giảm tương ứng
+                                            so_bo_giam = so_luong_xuat // dinh_muc
+                                            if so_bo_giam > 0:
+                                                cb_ton_hien_tai = int(combo_row["So_luong"])
+                                                cb_ton_moi = max(0, cb_ton_hien_tai - so_bo_giam)
+                                                cb_logs = combo_row.get("Nhat_ky", "")
+                                                cb_log_moi = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📉 Tự động giảm do xuất lẻ linh kiện '{selected_export_item}': -{so_bo_giam} {combo_row['Don_vi']}"
+                                                if cb_logs:
+                                                    cb_log_moi = cb_logs + "\n" + cb_log_moi
+                                                supabase.table("Ton_kho").update({
+                                                    "So_luong": cb_ton_moi,
+                                                    "Nhat_ky": cb_log_moi
+                                                }).eq("Ma_LK", cb_ma).execute()
+                            st.success(f"Xuất linh kiện lẻ thành công! Hệ thống đã tự động đồng bộ giảm số lượng bộ Combo tương ứng.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Lỗi khi thực hiện xuất kho: {e}")
