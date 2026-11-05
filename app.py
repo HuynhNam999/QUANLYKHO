@@ -154,7 +154,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Cải tiến cơ chế chọn và load dữ liệu cũ bằng Session State)
+    # 3. NHẬP MỚI COMBO (Đã fix lỗi cú pháp khi nạp dữ liệu cũ)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -168,7 +168,7 @@ with main_col:
             c_df = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             for _, r in c_df.iterrows():
                 d_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
-                combo_dict[d_str] = r
+                combo_dict[d_str] = r.to_dict()
         if "edit_combo_data" not in st.session_state:
             st.session_state.edit_combo_data = None
         if che_do_nhap.startswith("🔄"):
@@ -189,10 +189,10 @@ with main_col:
             if st.session_state.edit_combo_data is not None:
                 st.session_state.edit_combo_data = None
         active_data = st.session_state.edit_combo_data
-        def_ma = active_data["Ma_LK"] if active_data else ""
-        def_ten = active_data["Ten_LK"] if active_data else ""
-        def_dv = active_data["Don_vi"] if active_data and active_data["Don_vi"] in ["Bộ", "Hộp", "Combo"] else "Bộ"
-        def_img = active_data["Hinh_anh"] if active_data and active_data["Hinh_anh"] else ""
+        def_ma = active_data.get("Ma_LK", "") if active_data else ""
+        def_ten = active_data.get("Ten_LK", "") if active_data else ""
+        def_dv = active_data.get("Don_vi", "Bộ") if active_data and active_data.get("Don_vi") in ["Bộ", "Hộp", "Combo"] else "Bộ"
+        def_img = active_data.get("Hinh_anh", "") if active_data and active_data.get("Hinh_anh") else ""
         def_tp = active_data.get("Thanh_phan", []) if active_data else []
         with st.form("add_combo_form", clear_on_submit=False):
             st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
@@ -210,7 +210,7 @@ with main_col:
             st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Hiển thị theo chiều dọc, hỗ trợ tối đa 10 linh kiện)")
             st.info("💡 Mỗi dòng gồm: Mã linh kiện/vật tư, Định mức số lượng và Link hình ảnh thành phần. (Có thể sửa đổi hoặc để trống để xóa)")
             def get_tp_val(idx, field):
-                if idx < len(def_tp):
+                if idx < len(def_tp) and isinstance(def_tp, list):
                     val = def_tp[idx].get(field, "")
                     return val if val is not None else ""
                 return ""
