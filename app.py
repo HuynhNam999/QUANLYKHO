@@ -8,8 +8,10 @@ def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     with open("service_account.json", "r", encoding="utf-8") as f:
         creds_info = json.load(f)
+    # Tự động chuẩn hóa lại ký tự xuống dòng của private_key để chống lỗi chữ ký
+    if "private_key" in creds_info:
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
     return gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=scopes))
-try:
     gc = init_connection()
     sh = gc.open_by_key("11iic-jKj_RX7iPLwPCIOjatIWqr5X2Or9H2HnbHIQ")
     worksheet = sh.worksheet("TonKho")
