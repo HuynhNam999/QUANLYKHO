@@ -154,7 +154,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Đã fix tự động load đầy đủ thành phần cũ để chỉnh sửa/xóa bỏ)
+    # 3. NHẬP MỚI COMBO (Đã chuẩn hóa hiển thị trực tiếp dữ liệu cũ vào form)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -163,30 +163,32 @@ with main_col:
             ["➕ Nhập mới hoàn toàn", "🔄 Lấy theo dữ liệu Combo cũ để chỉnh sửa (thêm/bớt thành phần)"],
             horizontal=True
         )
-        combo_options = ["-- Chọn Combo cũ --"]
+        selected_cb = "-- Chọn Combo cũ --"
         combo_dict = {}
         if not df.empty:
             c_df = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             for _, r in c_df.iterrows():
                 d_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
-                combo_options.append(d_str)
                 combo_dict[d_str] = r
-        selected_cb = None
         if che_do_nhap.startswith("🔄"):
-            selected_cb = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", combo_options)
+            if combo_dict:
+                combo_options = ["-- Chọn Combo cũ --"] + list(combo_dict.keys())
+                selected_cb = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", combo_options)
+            else:
+                st.warning("Chưa có mã Combo nào trong hệ thống để chỉnh sửa!")
         def_ma = ""
         def_ten = ""
         def_dv = "Bộ"
         def_img = ""
         def_tp = []
-        if selected_cb and selected_cb != "-- Chọn Combo cũ --":
+        if selected_cb != "-- Chọn Combo cũ --":
             row_cb = combo_dict[selected_cb]
             def_ma = row_cb["Ma_LK"]
             def_ten = row_cb["Ten_LK"]
             def_dv = row_cb["Don_vi"] if row_cb["Don_vi"] in ["Bộ", "Hộp", "Combo"] else "Bộ"
             def_img = row_cb["Hinh_anh"] if row_cb["Hinh_anh"] else ""
             def_tp = row_cb.get("Thanh_phan", [])
-        with st.form("add_combo_form", clear_on_submit=True):
+        with st.form("add_combo_form", clear_on_submit=False):
             st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
             c1, c2 = st.columns(2)
             with c1:
