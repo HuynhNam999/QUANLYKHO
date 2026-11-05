@@ -1,10 +1,20 @@
 import streamlit as st
 import pandas as pd
-from st_gsheets import GSheetsConnection
-# Khởi tạo kết nối Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
+import gspread
+from google.oauth2.service_account import Credentials
+import json
+@st.cache_resource
+def init_connection():
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    with open("service_account.json", "r", encoding="utf-8") as f:
+        creds_info = json.load(f)
+    return gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=scopes))
 try:
-    df = conn.read(worksheet="TonKho", ttl=0)
+    gc = init_connection()
+    sh = gc.open_by_key("11iic-jKj_RX7iPLwPCIOjatIWqr5X2Or9H2HnbHIQ")
+    worksheet = sh.worksheet("TonKho")
+    data = worksheet.get_all_records()
+    df = pd.DataFrame(data)
 except Exception as e:
     st.error(f"Lỗi kết nối Google Sheets: {e}")
     st.stop()
@@ -16,19 +26,23 @@ if not st.session_state.logged_in:
     with st.form("login_form"):
         username = st.text_input("Tên đăng nhập")
         password = st.text_input("Mật khẩu", type="password")
-        if st.form_submit_button("Đăng nhập"):
+        submit_btn = st.form_submit_button("Đăng nhập")
+        if submit_btn:
             if username == "admin" and password == "123456":
-                st.session_state.logged_in, st.session_state.role = True, "Admin"
+                st.session_state.logged_in = True
+                st.session_state.role = "Admin"
                 st.rerun()
             elif username == "nhanvien" and password == "123456":
-                st.session_state.logged_in, st.session_state.role = True, "Nhân viên"
+                st.session_state.logged_in = True
+                st.session_state.role = "Nhân viên"
                 st.rerun()
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
-    st.session_state.logged_in, st.session_state.role = False, None
+    st.session_state.logged_in = False
+    st.session_state.role = None
     st.rerun()
 st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
 st.subheader("📊 Bảng Tồn Kho & Chi Tiết")
@@ -53,7 +67,6 @@ if not df.empty:
                 st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
-
 st.markdown("---")
 st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
 with st.form("add_form", clear_on_submit=True):
@@ -63,21 +76,13 @@ with st.form("add_form", clear_on_submit=True):
         ten_lk = st.text_input("Tên linh kiện / Combo")
         so_luong = st.number_input("Số lượng", min_value=0, step=1)
     with col2:
-        don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Combo...)")
+        don_vi = st.text_input("Don vị tính (Cái, Bộ, Combo...)")
         nhat_ky = st.text_input("Nhật ký xuất nhập")
         hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
-    if st.form_submit_button("Lưu dữ liệu vào Google Sheets"):
+    save_btn = st.form_submit_button("Lưu dữ liệu vào Google Sheets")
+    if save_btn:
         if ma_lk and ten_lk:
-            # Thêm dòng mới vào Google Sheets thông qua gspread trực tiếp hoặc append
-            import gspread
-            from google.oauth2.service_account import Credentials
-            scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-            creds_dict = dict(st.secrets["gsheets"])
-            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-            gc = gspread.authorize(Credentials.from_service_account_info(creds_dict, scopes=scope))
-            sh = gc.open_by_key("11iic-jKj_RX7iPLwPCIOjatIWqr5X2Or9H2HnbHIQ")
-            worksheet = sh.worksheet("TonKho")
-            worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi, nhat_ky, hinh_anh])      
+            worksheet.append_row([ma_lk, ten_lk, so_luong, don_vi, nhat_ky, hinh_anh])
             st.success("Đã lưu dữ liệu thành công lên Google Sheets vĩnh viễn!")
             st.rerun()
         else:
