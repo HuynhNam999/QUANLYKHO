@@ -154,7 +154,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Đã chuẩn hóa hiển thị trực tiếp dữ liệu cũ vào form)
+    # 3. NHẬP MỚI COMBO (Cải tiến cơ chế chọn và load dữ liệu cũ bằng Session State)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -163,31 +163,37 @@ with main_col:
             ["➕ Nhập mới hoàn toàn", "🔄 Lấy theo dữ liệu Combo cũ để chỉnh sửa (thêm/bớt thành phần)"],
             horizontal=True
         )
-        selected_cb = "-- Chọn Combo cũ --"
         combo_dict = {}
         if not df.empty:
             c_df = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             for _, r in c_df.iterrows():
                 d_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
                 combo_dict[d_str] = r
+        if "edit_combo_data" not in st.session_state:
+            st.session_state.edit_combo_data = None
         if che_do_nhap.startswith("🔄"):
             if combo_dict:
-                combo_options = ["-- Chọn Combo cũ --"] + list(combo_dict.keys())
-                selected_cb = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", combo_options)
+                col_sel1, col_sel2 = st.columns([3, 1])
+                with col_sel1:
+                    chosen_cb_str = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", list(combo_dict.keys()), key="select_combo_box")
+                with col_sel2:
+                    st.write("")
+                    st.write("")
+                    if st.button("🔄 Tải dữ liệu cũ"):
+                        st.session_state.edit_combo_data = combo_dict[chosen_cb_str]
+                        st.success(f"Đã tải dữ liệu của {chosen_cb_str}!")
+                        st.rerun()
             else:
-                st.warning("Chưa có mã Combo nào trong hệ thống để chỉnh sửa!")
-        def_ma = ""
-        def_ten = ""
-        def_dv = "Bộ"
-        def_img = ""
-        def_tp = []
-        if selected_cb != "-- Chọn Combo cũ --":
-            row_cb = combo_dict[selected_cb]
-            def_ma = row_cb["Ma_LK"]
-            def_ten = row_cb["Ten_LK"]
-            def_dv = row_cb["Don_vi"] if row_cb["Don_vi"] in ["Bộ", "Hộp", "Combo"] else "Bộ"
-            def_img = row_cb["Hinh_anh"] if row_cb["Hinh_anh"] else ""
-            def_tp = row_cb.get("Thanh_phan", [])
+                st.warning("Chưa có mã Combo nào trong hệ thống!")
+        else:
+            if st.session_state.edit_combo_data is not None:
+                st.session_state.edit_combo_data = None
+        active_data = st.session_state.edit_combo_data
+        def_ma = active_data["Ma_LK"] if active_data else ""
+        def_ten = active_data["Ten_LK"] if active_data else ""
+        def_dv = active_data["Don_vi"] if active_data and active_data["Don_vi"] in ["Bộ", "Hộp", "Combo"] else "Bộ"
+        def_img = active_data["Hinh_anh"] if active_data and active_data["Hinh_anh"] else ""
+        def_tp = active_data.get("Thanh_phan", []) if active_data else []
         with st.form("add_combo_form", clear_on_submit=False):
             st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
             c1, c2 = st.columns(2)
@@ -256,6 +262,7 @@ with main_col:
                             "Thanh_phan": danh_sach_thanh_phan
                         }
                         supabase.table("Ton_kho").upsert(new_data).execute()
+                        st.session_state.edit_combo_data = None
                         st.success("Đã lưu thành công dữ liệu Combo vào Database!")
                         st.rerun()
                     except Exception as e:
