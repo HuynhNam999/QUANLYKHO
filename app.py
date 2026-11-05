@@ -150,7 +150,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Giao diện Phần 2 dạng dọc gọn gàng có cột ảnh)
+    # 3. NHẬP MỚI COMBO
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -172,7 +172,6 @@ with main_col:
             selected_cb = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", combo_options)
         def_ma = ""
         def_ten = ""
-        def_sl = 0
         def_dv = "Bộ"
         def_img = ""
         def_tp = []
@@ -180,7 +179,6 @@ with main_col:
             row_cb = combo_dict[selected_cb]
             def_ma = row_cb["Ma_LK"]
             def_ten = row_cb["Ten_LK"]
-            def_sl = int(row_cb["So_luong"]) if "So_luong" in row_cb else 0
             def_dv = row_cb["Don_vi"] if row_cb["Don_vi"] in ["Bộ", "Hộp", "Combo"] else "Bộ"
             def_img = row_cb["Hinh_anh"] if row_cb["Hinh_anh"] else ""
             def_tp = row_cb.get("Thanh_phan", [])
@@ -190,7 +188,7 @@ with main_col:
             with c1:
                 ma_lk = st.text_input("Mã Combo (VD: CB-MVRS-01)", value=def_ma)
                 ten_lk = st.text_input("Tên Combo (VD: Bộ cánh quạt xe máy)", value=def_ten)
-                so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=def_sl)
+                so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0) # Đặt mặc định là 0 để người dùng tự nhập
             with c2:
                 don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0)
                 loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
@@ -204,7 +202,6 @@ with main_col:
                     return def_tp[idx].get(field, "")
                 return ""
             tps_input = []
-            # Hiển thị 10 dòng theo chiều dọc rõ ràng
             for i in range(1, 11):
                 st.markdown(f"**Thành phần {i}**")
                 col_m, col_s, col_i = st.columns([2, 1, 2])
@@ -235,6 +232,8 @@ with main_col:
                             nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
                         if not df.empty and ma_lk in df["Ma_LK"].values:
                             old_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+                            if loai_gd == "📥 Nhập kho mới":
+                                so_luong = int(old_row["So_luong"]) + int(so_luong)
                             old_logs = old_row.get("Nhat_ky", "")
                             if old_logs:
                                 nhat_ky_str = old_logs + "\n" + nhat_ky_str
@@ -282,7 +281,7 @@ with main_col:
             with c1:
                 ma_lk = st.text_input("Mã LK / VT (VD: LK-CANHQUAT-01)", value=def_ma)
                 ten_lk = st.text_input("Tên linh kiện / vật tư", value=def_ten)
-                so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1)
+                so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0)
             with c2:
                 don_vi = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"], index=["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"].index(def_dv) if def_dv in ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"] else 0)
                 loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
