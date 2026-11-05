@@ -6,10 +6,9 @@ import json
 @st.cache_resource
 def init_connection():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    # Đọc trực tiếp file service_account.json chuẩn từ GitHub, loại bỏ hoàn toàn lỗi Secrets
     with open("service_account.json", "r", encoding="utf-8") as f:
         creds_info = json.load(f)
-    if "private_key" in creds_info:
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
     return gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=scopes))
 try:
     gc = init_connection()
@@ -41,6 +40,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
+
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
     st.session_state.logged_in = False
@@ -80,7 +80,7 @@ with st.form("add_form", clear_on_submit=True):
     with col2:
         don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Combo...)")
         nhat_ky = st.text_input("Nhật ký xuất nhập")
-        hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
+        hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)") 
     save_btn = st.form_submit_button("Lưu dữ liệu vào Google Sheets")
     if save_btn:
         if ma_lk and ten_lk:
