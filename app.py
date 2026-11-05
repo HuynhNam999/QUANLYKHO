@@ -64,7 +64,7 @@ if st.sidebar.button("🚪 Đăng xuất"):
 _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
     if menu_choice == "📊 Tổng quan tồn kho":
-        st.title("📦 TỔNG QUAN TỒN KHO HỆ THỐNG")
+        st.title("📦 TỒN KHO HỆ THỐNG")
         st.markdown("---")
         if not df.empty:
             def highlight_negative(val):
@@ -109,7 +109,7 @@ with main_col:
                         st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=250)
                     else:
                         st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
-            st.markdown("### 📋 Danh sách lịch sử kho")
+            st.markdown("### 📋 NHẬT KÝ KHO")
             filtered_df = df.copy()
             if loai_loc != "Tất cả":
                 keyword_map = {
@@ -186,7 +186,7 @@ with main_col:
             ton_hien_tai = current_item_row["So_luong"]
             don_vi_tinh = current_item_row["Don_vi"]
             hinh_anh_cu = current_item_row["Hinh_anh"]
-            # Dòng 2: Hiển thị tự động tên linh kiện và số lượng tồn kho hiện tại dựa theo dòng 1
+            # Dòng 2: Tên linh kiện và số lượng tồn kho hiện tại
             st.info(f"📌 **2️⃣ Tên linh kiện tự động hiển thị:** {hien_thi_ten} (Đang tồn kho: **{ton_hien_tai} {don_vi_tinh}**)")
             # Form điền thông tin xuất kho
             with st.form("export_form", clear_on_submit=True):
