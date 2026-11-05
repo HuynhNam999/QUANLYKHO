@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 from supabase import create_client, Client
 # Cấu hình giao diện chiếm toàn màn hình
 st.set_page_config(page_title="Quản Lý Kho Cá Nhân", page_icon="📦", layout="wide")
@@ -46,14 +46,13 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-# --- BỐ CỤC CHÍNH: CHIA GIAO DIỆN THÀNH 2 KHU VỰC (TRÁI & PHẢI) ---
-# Thanh Sidebar bên trái dùng làm menu chọn chức năng / danh mục
+# --- MENU ĐIỀU HƯỚNG BÊN TRÁI ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
 menu_choice = st.sidebar.radio(
     "Chọn chức năng:",
-    ["📊 Tổng quan tồn kho", "🔍 Tra cứu & Lọc chi tiết", "➕➖ Thêm / Cập nhật linh kiện"]
+    ["📊 Tổng quan tồn kho", "🔍 Tra cứu & Lọc chi tiết", "➖ Thêm / Cập nhật linh kiện"]
 )
 st.sidebar.markdown("---")
 if st.sidebar.button("🚪 Đăng xuất"):
@@ -61,101 +60,116 @@ if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.role = None
     st.session_state.username = None
     st.rerun()
-# Khu vực hiển thị chính bên phải tương ứng với lựa chọn bên trái
-if menu_choice == "📊 Tổng quan tồn kho":
-    st.title("📦 TỔNG QUAN TỒN KHO HỆ THỐNG")
-    st.markdown("---")
-    if not df.empty:
-        st.dataframe(df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True, height=500)
-    else:
-        st.info("Kho hiện đang trống. Hãy chuyển sang mục 'Thêm / Cập nhật linh kiện' để nhập hàng mới!")
-elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
-    st.title("🔍 TRA CỨU & LỌC CHI TIẾT SẢN PHẨM")
-    st.markdown("---")   
-    if not df.empty:
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            loai_loc = st.selectbox(
-                "Lọc xem theo danh mục hoạt động", 
-                ["Tất cả", "📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"]
-            )
-        with col_f2:
-            selected_item = st.selectbox("Chọn mã linh kiện để xem chi tiết & ảnh", df["Ma_LK"].tolist())
-        if selected_item:
-            item_row = df[df["Ma_LK"] == selected_item].iloc[0]            
-            st.markdown("### 📄 Thông tin chi tiết sản phẩm")
-            col_info1, col_info2 = st.columns(2)
-            with col_info1:
-                st.write(f"**Mã LK:** {item_row.get('Ma_LK', '')}")
-                st.write(f"**Tên LK:** {item_row.get('Ten_LK', '')}")
-                st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
-                st.write(f"**Nhật ký thao tác:** {item_row.get('Nhat_ky', 'Chưa có nhật ký')}")
-            with col_info2:
-                img_url = item_row.get('Hinh_anh', '')
-                if img_url and str(img_url).startswith("http"):
-                    st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=250)
-                else:
-                    st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
-        # Hiển thị bảng theo bộ lọc
-        st.markdown("### 📋 Danh sách lọc theo hạng mục")
-        if loai_loc != "Tất cả":
-            keyword_map = {
-                "📥 Nhập kho": "Nhập kho",
-                "📤 Xuất kho": "Xuất kho",
-                "🔄 Cập nhật thông tin": "Cập nhật"
-            }
-            kw = keyword_map.get(loai_loc, "")
-            filtered_df = df[df["Nhat_ky"].str.contains(kw, na=False)]
-            st.info(f"Đang hiển thị hạng mục: **{loai_loc}** (Tổng số: {len(filtered_df)} bản ghi)")
+# --- GIAO DIỆN CHÍNH BÊN PHẢI (SỬ DỤNG CỘT ĐỂ ĐƯA RA GIỮA) ---
+_, main_col, _ = st.columns([0.05, 0.9, 0.05])
+with main_col:
+    if menu_choice == "📊 Tổng quan tồn kho":
+        st.title("📦 TỔNG QUAN TỒN KHO HỆ THỐNG")
+        st.markdown("---")
+        if not df.empty:
+            st.dataframe(df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True, height=500)
+        else:
+            st.info("Kho hiện đang trống. Hãy chuyển sang mục 'Thêm / Cập nhật linh kiện' để nhập hàng mới!")
+    elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
+        st.title("🔍 TRA CỨU & LỌC CHI TIẾT SẢN PHẨM")
+        st.markdown("---")    
+        if not df.empty:
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                loai_loc = st.selectbox(
+                    "Lọc theo danh mục hoạt động", 
+                    ["Tất cả", "📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"]
+                )
+            with col_f2:
+                selected_item = st.selectbox("Chọn mã linh kiện", df["Ma_LK"].tolist())
+            with col_f3:
+                # Tùy chọn lọc theo ngày
+                bat_tat_ngay = st.checkbox("Lọc theo ngày cụ thể")
+                ngay_chon = st.date_input("Chọn ngày", value=date.today())
+            # Hiển thị chính xác thông tin của mã được chọn (không bị lệch dòng)
+            if selected_item:
+                item_row = df[df["Ma_LK"] == selected_item].iloc[0]            
+                st.markdown("### 📄 Thông tin chi tiết sản phẩm")
+                col_info1, col_info2 = st.columns(2)
+                with col_info1:
+                    st.write(f"**Mã LK:** {item_row.get('Ma_LK', '')}")
+                    st.write(f"**Tên LK:** {item_row.get('Ten_LK', '')}")
+                    st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
+                    st.write(f"**Nhật ký thao tác:** {item_row.get('Nhat_ky', 'Chưa có nhật ký')}")
+                with col_info2:
+                    img_url = item_row.get('Hinh_anh', '')
+                    if img_url and str(img_url).startswith("http"):
+                        st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=250)
+                    else:
+                        st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
+            # Lọc danh sách theo hạng mục và ngày tháng
+            st.markdown("### 📋 Danh sách lịch sử kho")
+            filtered_df = df.copy()
+            # Lọc theo danh mục
+            if loai_loc != "Tất cả":
+                keyword_map = {
+                    "📥 Nhập kho": "Nhập kho",
+                    "📤 Xuất kho": "Xuất kho",
+                    "🔄 Cập nhật thông tin": "Cập nhật"
+                }
+                kw = keyword_map.get(loai_loc, "")
+                filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(kw, na=False)]
+            # Lọc theo ngày nếu người dùng bật checkbox
+            if bat_tat_ngay:
+                format_ngay = ngay_chon.strftime("%d/%m/%Y")
+                filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(format_ngay, na=False)]
+                st.info(f"Đang lọc dữ liệu ngày: **{format_ngay}** | Hạng mục: **{loai_loc}** (Tổng số: {len(filtered_df)} bản ghi)")
+            else:
+                st.info(f"Đang hiển thị toàn bộ dữ liệu | Hạng mục: **{loai_loc}** (Tổng số: {len(filtered_df)} bản ghi)")
             if not filtered_df.empty:
                 st.dataframe(filtered_df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True)
             else:
-                st.warning(f"Chưa có dữ liệu nào thuộc hạng mục '{loai_loc}'.")
+                st.warning("Không tìm thấy dữ liệu phù hợp với bộ lọc.")
         else:
-            st.dataframe(df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True)
-    else:
-        st.info("Kho hiện đang trống.")
-elif menu_choice == "➕➖Thêm / Cập nhật linh kiện":
-    st.title("➕➖ THÊM / CẬP NHẬT LINH KIỆN & COMBO MỚI")
-    st.markdown("---")    
-    # Hướng dẫn quy tắc đặt mã
-    with st.expander("📌 Hướng dẫn quy tắc đặt Mã Linh Kiện / Combo (Bấm vào để xem)", expanded=False):
-        st.markdown("""
-        * **Linh kiện lẻ:** `LK-[Nhóm]-[TênViếtTắt]-[SốThứTự]` (Ví dụ: `LK-IC-NE555-01`)
-        * **Combo sản phẩm:** `CB-[TênGói]-[PhiênBản]` (Ví dụ: `CB-ARDUINO-V1`)
-        """)
-    with st.form("add_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            ma_lk = st.text_input("Mã linh kiện / Combo (VD: LK-IC-01)")
-            ten_lk = st.text_input("Tên linh kiện / Combo")
-            so_luong = st.number_input("Số lượng", min_value=0, step=1)
-            don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Cái", "Túi", "Combo", "Cuộn", "Hộp", "Chiếc"])
-        with col2:
-            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"])
-            ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
-            ghi_chu_tay = st.text_input("Ghi chú thêm (tùy chọn)", placeholder="Ví dụ: Kiểm kê định kỳ tháng này")
-            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")       
-        save_btn = st.form_submit_button("Lưu dữ liệu vào Database")
-        if save_btn:
-            if ma_lk and ten_lk:
-                try:
-                    nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
-                    if ghi_chu_tay:
-                        nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
-                    new_data = {
-                        "Ma_LK": ma_lk,
-                        "Ten_LK": ten_lk,
-                        "So_luong": int(so_luong),
-                        "Don_vi": don_vi,
-                        "Nhat_ky": nhat_ky_str,
-                        "Hinh_anh": hinh_anh
-                    }                  
-                    supabase.table("Ton_kho").upsert(new_data).execute()
-                    st.success("Đã ghi nhận lịch sử và lưu dữ liệu thành công vĩnh viễn!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Lỗi khi lưu dữ liệu: {e}")
-            else:
-                st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
+            st.info("Kho hiện đang trống.")
+
+    elif menu_choice == "➖ Thêm / Cập nhật linh kiện":
+        st.title("➖ THÊM / CẬP NHẬT LINH KIỆN & COMBO MỚI")
+        st.markdown("---")       
+        # Hướng dẫn quy tắc đặt mã
+        with st.expander("📌 Hướng dẫn quy tắc đặt Mã Linh Kiện / Combo (Bấm vào để xem)", expanded=False):
+            st.markdown("""
+            * **Linh kiện lẻ:** `LK-[Nhóm]-[TênViếtTắt]-[SốThứTự]` (Ví dụ: `LK-IC-NE555-01`)
+            * **Combo sản phẩm:** `CB-[TênGói]-[PhiênBản]` (Ví dụ: `CB-ARDUINO-V1`)
+            """)
+        with st.form("add_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                ma_lk = st.text_input("Mã linh kiện / Combo (VD: LK-IC-01)")
+                ten_lk = st.text_input("Tên linh kiện / Combo")
+                so_luong = st.number_input("Số lượng", min_value=0, step=1)
+                don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Cái", "Túi", "Combo", "Cuộn", "Hộp", "Chiếc"])
+            with col2:
+                loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"])
+                ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                ghi_chu_tay = st.text_input("Ghi chú thêm (tùy chọn)", placeholder="Ví dụ: Kiểm kê định kỳ tháng này")
+                hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")           
+            save_btn = st.form_submit_button("Lưu dữ liệu vào Database")
+            if save_btn:
+                if ma_lk and ten_lk:
+                    try:
+                        nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                        nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
+                        if ghi_chu_tay:
+                            nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
+
+                        new_data = {
+                            "Ma_LK": ma_lk,
+                            "Ten_LK": ten_lk,
+                            "So_luong": int(so_luong),
+                            "Don_vi": don_vi,
+                            "Nhat_ky": nhat_ky_str,
+                            "Hinh_anh": hinh_anh
+                        }                     
+                        supabase.table("Ton_kho").upsert(new_data).execute()
+                        st.success("Đã ghi nhận lịch sử và lưu dữ liệu thành công vĩnh viễn!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Lỗi khi lưu dữ liệu: {e}")
+                else:
+                    st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
