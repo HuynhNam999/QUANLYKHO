@@ -130,7 +130,7 @@ with st.form("add_form", clear_on_submit=True):
         if ma_lk and ten_lk:
             try:
                 nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                nhat_ky_str = f"[{ngay_hien_tai}] 👤 {Nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
+                nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
                 if ghi_chu_tay:
                     nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
                 new_data = {
