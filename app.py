@@ -50,7 +50,7 @@ if st.sidebar.button("Đăng xuất"):
     st.session_state.role = None
     st.session_state.username = None
     st.rerun()
-st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
+st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO")
 st.subheader("📊 Bảng Tồn Kho & Chi Tiết")
 if not df.empty:
     st.dataframe(df, use_container_width=True)
@@ -105,7 +105,7 @@ if not df.empty:
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
 st.markdown("---")
-st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
+st.subheader("➕➖ Nhập/xuất/Cập Nhật Linh Kiện & Combo Mới")
 
 # Hướng dẫn quy tắc đặt mã
 with st.expander("📌 Hướng dẫn quy tắc đặt Mã Linh Kiện / Combo (Bấm vào để xem)", expanded=False):
@@ -123,7 +123,7 @@ with st.form("add_form", clear_on_submit=True):
     with col2:
         loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"])
         ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
-        ghi_chu_tay = st.text_input("Ghi chú thêm (tùy chọn)", placeholder="Ví dụ: Kiểm kê định kỳ tháng này")
+        ghi_chu_tay = st.text_input("Ghi chú thêm (tùy chọn)", placeholder="Ví dụ: Xuất/Nhập từ anh A")
         hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")  
     save_btn = st.form_submit_button("Lưu dữ liệu vào Database")
     if save_btn:
