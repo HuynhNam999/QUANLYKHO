@@ -1,16 +1,13 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
-
 # Khởi tạo kết nối Supabase an toàn tuyệt đối từ Secrets
 @st.cache_resource
 def init_supabase():
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
-
 supabase: Client = init_supabase()
-
 # Tải dữ liệu từ bảng Ton_kho
 @st.cache_data(ttl=0)
 def load_data():
@@ -20,14 +17,11 @@ def load_data():
     except Exception as e:
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
-
 df = load_data()
-
 # Quản lý đăng nhập hệ thống
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
-
 if not st.session_state.logged_in:
     st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ KHO")
     with st.form("login_form"):
@@ -46,15 +40,12 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
     st.session_state.logged_in = False
     st.session_state.role = None
     st.rerun()
-
 st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
-
 st.subheader("📊 Bảng Tồn Kho & Chi Tiết")
 if not df.empty:
     st.dataframe(df, use_container_width=True)
@@ -77,20 +68,28 @@ if not df.empty:
                 st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
-
 st.markdown("---")
 st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
+
+# --- PHẦN HƯỚNG DẪN CẤU TRÚC TẠO MÃ CHO NGƯỜI MỚI ---
+with st.expander("📌 Hướng dẫn quy tắc đặt Mã Linh Kiện / Combo (Bấm vào để xem)", expanded=True):
+    st.markdown("""
+    Để đảm bảo tính đồng bộ và dễ tra cứu cho toàn hệ thống, vui lòng tuân thủ cấu trúc tạo mã sau:
+    * **Linh kiện lẻ:** `LK-[Nhóm]-[TênViếtTắt]-[SốThứTự]` (Ví dụ: `LK-IC-NE555-01`, `LK-RES-10K-05`)
+    * **Combo sản phẩm:** `CB-[TênGói]-[PhiênBản]` (Ví dụ: `CB-ARDUINO-V1`, `CB-SOLDER-KIT-02`)
+    * **Lưu ý:** Mã không được trùng lặp, viết hoa không dấu và không chứa khoảng trắng.
+    """)
+# -----------------------------------------------------
 with st.form("add_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
     with col1:
-        ma_lk = st.text_input("Mã linh kiện / Combo")
+        ma_lk = st.text_input("Mã linh kiện / Combo (VD: LK-IC-01)")
         ten_lk = st.text_input("Tên linh kiện / Combo")
         so_luong = st.number_input("Số lượng", min_value=0, step=1)
     with col2:
         don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Combo...)")
         nhat_ky = st.text_input("Nhật ký xuất nhập")
         hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
-    
     save_btn = st.form_submit_button("Lưu dữ liệu vào Database")
     if save_btn:
         if ma_lk and ten_lk:
