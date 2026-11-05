@@ -187,7 +187,7 @@ with main_col:
             don_vi_tinh = current_item_row["Don_vi"]
             hinh_anh_cu = current_item_row["Hinh_anh"]
             # Dòng 2: Tên linh kiện và số lượng tồn kho hiện tại
-            st.info(f"2️⃣ Tên linh kiện:** {hien_thi_ten} (Đang tồn kho: **{ton_hien_tai} {don_vi_tinh}**)")
+            st.info(f"2️⃣ Tên linh kiện: {hien_thi_ten} (Đang tồn kho: **{ton_hien_tai} {don_vi_tinh}**)")
             # Form điền thông tin xuất kho
             with st.form("export_form", clear_on_submit=True):
                 col_ex1, col_ex2 = st.columns(2)
