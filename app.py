@@ -186,4 +186,100 @@ with main_col:
                         if tp1_opt != "Không chọn":
                             danh_sach_thanh_phan.append({"ma": code_map[tp1_opt], "sl": int(tp1_sl)})
                         if tp2_opt != "Không chọn":
-                            danh_sach_thanh_phan.append({"ma": code_map[tp2_opt], "sl": int(tp2_
+                            danh_sach_thanh_phan.append({"ma": code_map[tp2_opt], "sl": int(tp2_sl)})
+                        if tp3_opt != "Không chọn":
+                            danh_sach_thanh_phan.append({"ma": code_map[tp3_opt], "sl": int(tp3_sl)})
+                        nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                        nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
+                        if ghi_chu_tay:
+                            nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
+                        new_data = {
+                            "Ma_LK": ma_lk,
+                            "Ten_LK": ten_lk,
+                            "So_luong": int(so_luong),
+                            "Don_vi": don_vi,
+                            "Nhat_ky": nhat_ky_str,
+                            "Hinh_anh": hinh_anh,
+                            "Thanh_phan": danh_sach_thanh_phan
+                        }
+                        supabase.table("Ton_kho").upsert(new_data).execute()
+                        st.success("Đã lưu cấu hình và dữ liệu thành công!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Lỗi khi lưu dữ liệu: {e}")
+                else:
+                    st.warning("Vui lòng điền đầy đủ Mã và Tên!")
+    elif menu_choice == "📤 Xuất kho thông minh":
+        st.title("📤 XUẤT KHO THÔNG MINH")
+        st.markdown("---")
+        st.info("💡 Bạn có thể chọn bất kỳ mã nào trong kho để xuất: **Xuất Combo** (tự động trừ kèm linh kiện con) hoặc **Xuất lẻ linh kiện thành phần độc lập** tùy ý.")
+        if not df.empty:
+            # Hiển thị lựa chọn dạng [Mã] - Tên để dễ thao tác
+            export_options = [f"[{row['Ma_LK']}] - {row['Ten_LK']}" for _, row in df.iterrows()]
+            selected_export_opt = st.selectbox("1️⃣ Chọn sản phẩm / linh kiện cần xuất kho", export_options)
+            # Trích xuất lại mã từ chuỗi chọn
+            selected_export_item = selected_export_opt.split("]")[0].replace("[", "")
+            current_item_row = df[df["Ma_LK"] == selected_export_item].iloc[0]
+            hien_thi_ten = current_item_row["Ten_LK"]
+            ton_hien_tai = current_item_row["So_luong"]
+            don_vi_tinh = current_item_row["Don_vi"]
+            hinh_anh_cu = current_item_row["Hinh_anh"]
+            thanh_phan_list = current_item_row.get("Thanh_phan", [])
+            st.warning(📦 f"**Sản phẩm chọn:** {hien_thi_ten} (`{selected_export_item}`) | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}**")
+            # Nếu là Combo, hiển thị các linh kiện thành phần sẽ bị trừ theo
+            if thanh_phan_list and isinstance(thanh_phan_list, list) and len(thanh_phan_list) > 0:
+                st.info("🔗 **Đây là Combo có chứa các linh kiện con sau sẽ được trừ tự động theo số lượng xuất:**")
+                for tp in thanh_phan_list:
+                    sub_item = df[df["Ma_LK"] == tp.get('ma')]
+                    sub_name = sub_item.iloc[0]["Ten_LK"] if not sub_item.empty else "Không rõ"
+                    sub_stock = sub_item.iloc[0]["So_luong"] if not sub_item.empty else 0
+                    st.write(f"- `{tp.get('ma')}` ({sub_name}) | Trừ thêm: **{tp.get('sl')} x SL xuất** | Tồn kho hiện tại của linh kiện con: `{sub_stock}`")
+            with st.form("export_form", clear_on_submit=True):
+                col_ex1, col_ex2 = st.columns(2)
+                with col_ex1:
+                    so_luong_xuat = st.number_input("Số lượng xuất kho", min_value=1, step=1, value=1)
+                with col_ex2:
+                    ngay_xuat = st.date_input("Ngày xuất", value=date.today())
+                noi_dung_xuat = st.text_input("Nội dung / Mục đích xuất kho", placeholder="Ví dụ: Xuất lắp ráp hoặc xuất lẻ linh kiện")
+                export_btn = st.form_submit_button("Xác nhận Xuất Kho")
+                if export_btn:
+                    try:
+                        nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                        ngay_gio_str = ngay_xuat.strftime("%d/%m/%Y") + " " + datetime.now().strftime("%H:%M")
+                        # 1. Trừ kho mục chính được chọn
+                        so_luong_moi = int(ton_hien_tai) - int(so_luong_xuat)
+                        nhat_ky_xuat = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📤 Xuất kho: {so_luong_xuat} {don_vi_tinh}"
+                        if noi_dung_xuat:
+                            nhat_ky_xuat += f" | Nội dung: {noi_dung_xuat}"
+                        update_data = {
+                            "Ma_LK": selected_export_item,
+                            "Ten_LK": hien_thi_ten,
+                            "So_luong": so_luong_moi,
+                            "Don_vi": don_vi_tinh,
+                            "Nhat_ky": nhat_ky_xuat,
+                            "Hinh_anh": hinh_anh_cu,
+                            "Thanh_phan": thanh_phan_list
+                        }
+                        supabase.table("Ton_kho").upsert(update_data).execute()
+                        # 2. Nếu là Combo, tự động trừ kho các linh kiện con bên trong
+                        if thanh_phan_list and isinstance(thanh_phan_list, list):
+                            for tp in thanh_phan_list:
+                                sub_ma = tp.get('ma')
+                                sub_sl_can_dung = int(tp.get('sl')) * int(so_luong_xuat)
+                                sub_row_df = df[df["Ma_LK"] == sub_ma]
+                                if not sub_row_df.empty:
+                                    sub_row = sub_row_df.iloc[0]
+                                    sub_ton_cu = int(sub_row["So_luong"])
+                                    sub_ton_moi = sub_ton_cu - sub_sl_can_dung
+                                    sub_logs = sub_row.get("Nhat_ky", "")
+                                    sub_log_moi = f"\n[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📉 Trừ tự động theo Combo '{selected_export_item}': -{sub_sl_can_dung}"
+                                    supabase.table("Ton_kho").update({
+                                        "So_luong": sub_ton_moi,
+                                        "Nhat_ky": sub_logs + sub_log_moi
+                                    }).eq("Ma_LK", sub_ma).execute()
+                        st.success(f"Xuất kho thành công! Hệ thống đã cập nhật tồn kho mới.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Lỗi khi thực hiện xuất kho: {e}")
+        else:
+            st.warning("Kho hiện đang trống!")
