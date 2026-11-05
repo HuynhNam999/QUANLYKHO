@@ -109,12 +109,12 @@ with main_col:
                 st.markdown("### 📄 Thông tin chi tiết sản phẩm / Combo")
                 col_info1, col_info2 = st.columns(2)
                 with col_info1:
-                    st.write(f"**Mã LK:** {item_row.get('Ma_LK', '')}")
-                    st.write(f"**Tên LK:** {item_row.get('Ten_LK', '')}")
+                    st.write(f"**Mã LK/VT/CB:** {item_row.get('Ma_LK', '')}")
+                    st.write(f"**Tên:** {item_row.get('Ten_LK', '')}")
                     st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
                     thanh_phan = item_row.get('Thanh_phan', None)
                     if thanh_phan and isinstance(thanh_phan, list) and len(thanh_phan) > 0:
-                        st.markdown("**🔗 Các linh kiện thành phần trong bộ:**")
+                        st.markdown("**🔗 Các linh kiện/vật tư thành phần trong bộ:**")
                         for tp in thanh_phan:
                             sub_m = tp.get('ma')
                             sub_sl = tp.get('sl')
@@ -147,12 +147,12 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Gồm Phần 1: Khai báo Combo & Phần 2: Thành phần trong combo)
+    # 3. NHẬP MỚI COMBO (Phần 1: Thông tin Combo & Phần 2: Thành phần 1 đến 10)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
         st.markdown("---")
         with st.form("add_combo_form", clear_on_submit=True):
-            st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
+            st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO (Mã bắt đầu bằng CB-...)")
             c1, c2 = st.columns(2)
             with c1:
                 ma_lk = st.text_input("Mã Combo (VD: CB-MVRS-01)")
@@ -164,7 +164,8 @@ with main_col:
                 hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
             ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập kho bộ combo mới")
             st.markdown("---")
-            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Định mức từ 1 đến 10 linh kiện)")
+            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Định mức từ 1 đến 10 linh kiện/vật tư)")
+            st.info("💡 Lưu ý: Các mã linh kiện / vật tư lẻ (bắt đầu bằng LK hoặc VT) cần được tạo ở mục 'Nhập mới Linh kiện lẻ' trước để có thể chọn định mức ở đây.")
             options_list = ["Không chọn"]
             code_map = {}
             if not df.empty:
@@ -172,41 +173,41 @@ with main_col:
                     display_str = f"{row['Ma_LK']} - {row['Ten_LK']}"
                     options_list.append(display_str)
                     code_map[display_str] = row['Ma_LK']
-            # 10 linh kiện thành phần
+            # 10 linh kiện / vật tư thành phần
             sc1, sc2 = st.columns(2)
             with sc1:
-                tp1_opt = st.selectbox("Thành phần 1 (Mã & Tên)", options_list, key="tp1_o")
+                tp1_opt = st.selectbox("Thành phần 1 (LK/VT)", options_list, key="tp1_o")
                 tp1_sl = st.number_input("Định mức SL thành phần 1", min_value=1, value=1, key="tp1_s")
             with sc2:
-                tp2_opt = st.selectbox("Thành phần 2 (Mã & Tên)", options_list, key="tp2_o")
+                tp2_opt = st.selectbox("Thành phần 2 (LK/VT)", options_list, key="tp2_o")
                 tp2_sl = st.number_input("Định mức SL thành phần 2", min_value=1, value=1, key="tp2_s")
             sc3, sc4 = st.columns(2)
             with sc3:
-                tp3_opt = st.selectbox("Thành phần 3 (Mã & Tên)", options_list, key="tp3_o")
+                tp3_opt = st.selectbox("Thành phần 3 (LK/VT)", options_list, key="tp3_o")
                 tp3_sl = st.number_input("Định mức SL thành phần 3", min_value=1, value=1, key="tp3_s")
             with sc4:
-                tp4_opt = st.selectbox("Thành phần 4 (Mã & Tên)", options_list, key="tp4_o")
+                tp4_opt = st.selectbox("Thành phần 4 (LK/VT)", options_list, key="tp4_o")
                 tp4_sl = st.number_input("Định mức SL thành phần 4", min_value=1, value=1, key="tp4_s")
             sc5, sc6 = st.columns(2)
             with sc5:
-                tp5_opt = st.selectbox("Thành phần 5 (Mã & Tên)", options_list, key="tp5_o")
+                tp5_opt = st.selectbox("Thành phần 5 (LK/VT)", options_list, key="tp5_o")
                 tp5_sl = st.number_input("Định mức SL thành phần 5", min_value=1, value=1, key="tp5_s")
             with sc6:
-                tp6_opt = st.selectbox("Thành phần 6 (Mã & Tên)", options_list, key="tp6_o")
+                tp6_opt = st.selectbox("Thành phần 6 (LK/VT)", options_list, key="tp6_o")
                 tp6_sl = st.number_input("Định mức SL thành phần 6", min_value=1, value=1, key="tp6_s")
             sc7, sc8 = st.columns(2)
             with sc7:
-                tp7_opt = st.selectbox("Thành phần 7 (Mã & Tên)", options_list, key="tp7_o")
+                tp7_opt = st.selectbox("Thành phần 7 (LK/VT)", options_list, key="tp7_o")
                 tp7_sl = st.number_input("Định mức SL thành phần 7", min_value=1, value=1, key="tp7_s")
             with sc8:
-                tp8_opt = st.selectbox("Thành phần 8 (Mã & Tên)", options_list, key="tp8_o")
+                tp8_opt = st.selectbox("Thành phần 8 (LK/VT)", options_list, key="tp8_o")
                 tp8_sl = st.number_input("Định mức SL thành phần 8", min_value=1, value=1, key="tp8_s")
             sc9, sc10 = st.columns(2)
             with sc9:
-                tp9_opt = st.selectbox("Thành phần 9 (Mã & Tên)", options_list, key="tp9_o")
+                tp9_opt = st.selectbox("Thành phần 9 (LK/VT)", options_list, key="tp9_o")
                 tp9_sl = st.number_input("Định mức SL thành phần 9", min_value=1, value=1, key="tp9_s")
             with sc10:
-                tp10_opt = st.selectbox("Thành phần 10 (Mã & Tên)", options_list, key="tp10_o")
+                tp10_opt = st.selectbox("Thành phần 10 (LK/VT)", options_list, key="tp10_o")
                 tp10_sl = st.number_input("Định mức SL thành phần 10", min_value=1, value=1, key="tp10_s")
             danh_sach_thanh_phan = []
             tps = [
@@ -241,22 +242,23 @@ with main_col:
                         st.error(f"Lỗi khi lưu dữ liệu: {e}")
                 else:
                     st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
-    # 4. NHẬP MỚI LINH KIỆN LẺ
+    # 4. NHẬP MỚI LINH KIỆN LẺ (Mã bắt đầu LK hoặc VT)
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
-        st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN LẺ")
+        st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
+        st.info("💡 Quy tắc mã linh kiện / vật tư lẻ nên bắt đầu bằng tiền tố **LK-** hoặc **VT-** (Ví dụ: `LK-01`, `VT-OCVIT-05`).")
         with st.form("add_item_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
-                ma_lk = st.text_input("Mã linh kiện (VD: LK-01)")
-                ten_lk = st.text_input("Tên linh kiện (VD: Ốc vít 5 ly)")
+                ma_lk = st.text_input("Mã LK / VT (VD: LK-01 hoặc VT-OCVIT-05)")
+                ten_lk = st.text_input("Tên linh kiện / vật tư (VD: Ốc vít 5 ly)")
                 so_luong = st.number_input("Số lượng tồn kho ban đầu", min_value=0, step=1)
             with c2:
-                don_vi = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp"])
+                don_vi = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"])
                 loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
                 hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
-            ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập linh kiện lẻ")
-            save_btn = st.form_submit_button("💾 Lưu Linh kiện lẻ vào Database")
+            ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới")
+            save_btn = st.form_submit_button("💾 Lưu Linh kiện/Vật tư lẻ vào Database")
             if save_btn:
                 if ma_lk and ten_lk:
                     try:
@@ -275,21 +277,20 @@ with main_col:
                             "Thanh_phan": []
                         }
                         supabase.table("Ton_kho").upsert(new_data).execute()
-                        st.success("Đã lưu linh kiện lẻ thành công!")
+                        st.success("Đã lưu linh kiện/vật tư lẻ thành công!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Lỗi khi lưu dữ liệu: {e}")
                 else:
-                    st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện!")
+                    st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện/vật tư!")
     # 5. XUẤT KHO COMBO (Tự động trừ định mức linh kiện con)
     elif menu_choice == "📤 Xuất kho Combo":
-        st.title("📤 XUẤT KHO COMBO (Tự động trừ định mức linh kiện con)")
+        st.title("📤 XUẤT KHO COMBO (Tự động trừ định mức linh kiện/vật tư con)")
         st.markdown("---")
         if not df.empty:
-            # Lọc chỉ lấy các mã có dạng bắt đầu bằng CB hoặc có cấu hình thành phần
             combo_df = df[df["Ma_LK"].str.startswith("CB", na=False)]
             if combo_df.empty:
-                combo_df = df # Fallback nếu chưa đặt tên mã bắt đầu bằng CB
+                combo_df = df
             export_options = [f"{row['Ma_LK']} - {row['Ten_LK']}" for _, row in combo_df.iterrows()]
             selected_export_opt = st.selectbox("1️⃣ Chọn Combo cần xuất kho", export_options)
             selected_export_item = selected_export_opt.split(" - ")[0]
@@ -301,7 +302,7 @@ with main_col:
             thanh_phan_list = current_item_row.get("Thanh_phan", [])
             st.warning(f"📦 **Combo chọn:** {hien_thi_ten} (`{selected_export_item}`) | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}**")
             if thanh_phan_list and isinstance(thanh_phan_list, list) and len(thanh_phan_list) > 0:
-                st.info("🔗 **Các linh kiện con bên trong sẽ được trừ tự động theo định mức:**")
+                st.info("🔗 **Các linh kiện/vật tư con bên trong sẽ được trừ tự động theo định mức:**")
                 for tp in thanh_phan_list:
                     sub_item = df[df["Ma_LK"] == tp.get('ma')]
                     sub_name = sub_item.iloc[0]["Ten_LK"] if not sub_item.empty else "Không rõ"
@@ -348,7 +349,7 @@ with main_col:
                                         "So_luong": sub_ton_moi,
                                         "Nhat_ky": sub_logs + sub_log_moi
                                     }).eq("Ma_LK", sub_ma).execute()
-                        st.success(f"Xuất kho Combo thành công! Đã trừ định mức linh kiện thành phần.")
+                        st.success(f"Xuất kho Combo thành công! Đã trừ định mức linh kiện/vật tư thành phần.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Lỗi khi thực hiện xuất kho: {e}")
@@ -356,11 +357,11 @@ with main_col:
             st.warning("Kho hiện đang trống!")
     # 6. XUẤT KHO LINH KIỆN LẺ
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
-        st.title("📤 XUẤT KHO LINH KIỆN LẺ (Độc lập)")
+        st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập)")
         st.markdown("---")
         if not df.empty:
             export_options = [f"{row['Ma_LK']} - {row['Ten_LK']}" for _, row in df.iterrows()]
-            selected_export_opt = st.selectbox("1️⃣ Chọn linh kiện cần xuất kho", export_options)
+            selected_export_opt = st.selectbox("1️⃣ Chọn linh kiện / vật tư cần xuất kho", export_options)
             selected_export_item = selected_export_opt.split(" - ")[0]
             current_item_row = df[df["Ma_LK"] == selected_export_item].iloc[0]
             hien_thi_ten = current_item_row["Ten_LK"]
@@ -368,15 +369,15 @@ with main_col:
             don_vi_tinh = current_item_row["Don_vi"]
             hinh_anh_cu = current_item_row["Hinh_anh"]
             thanh_phan_list = current_item_row.get("Thanh_phan", [])
-            st.warning(f"🔩 **Linh kiện chọn:** {hien_thi_ten} (`{selected_export_item}`) | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}**")
+            st.warning(f"🔩 **Linh kiện/Vật tư chọn:** {hien_thi_ten} (`{selected_export_item}`) | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}**")
             with st.form("export_item_form", clear_on_submit=True):
                 col_ex1, col_ex2 = st.columns(2)
                 with col_ex1:
                     so_luong_xuat = st.number_input("Số lượng xuất kho", min_value=1, step=1, value=1)
                 with col_ex2:
                     ngay_xuat = st.date_input("Ngày xuất", value=date.today())
-                noi_dung_xuat = st.text_input("Nội dung / Mục đích xuất kho", placeholder="Ví dụ: Xuất linh kiện sửa chữa lẻ")
-                export_btn = st.form_submit_button("Xác nhận Xuất Linh kiện")
+                noi_dung_xuat = st.text_input("Nội dung / Mục đích xuất kho", placeholder="Ví dụ: Xuất vật tư sửa chữa lẻ")
+                export_btn = st.form_submit_button("Xác nhận Xuất Linh kiện/Vật tư")
                 if export_btn:
                     try:
                         nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
@@ -395,7 +396,7 @@ with main_col:
                             "Thanh_phan": thanh_phan_list
                         }
                         supabase.table("Ton_kho").upsert(update_data).execute()
-                        st.success(f"Xuất linh kiện lẻ thành công! Tồn kho mới còn lại: {so_luong_moi} {don_vi_tinh}")
+                        st.success(f"Xuất linh kiện/vật tư lẻ thành công! Tồn kho mới còn lại: {so_luong_moi} {don_vi_tinh}")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Lỗi khi thực hiện xuất kho: {e}")
