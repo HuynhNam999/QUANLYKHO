@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from supabase import create_client, Client
 # Khởi tạo kết nối Supabase an toàn tuyệt đối từ Secrets
 @st.cache_resource
@@ -70,39 +71,45 @@ else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
 st.markdown("---")
 st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
-
-# --- PHẦN HƯỚNG DẪN CẤU TRÚC TẠO MÃ CHO NGƯỜI MỚI ---
-with st.expander("📌 Hướng dẫn quy tắc đặt Mã Linh Kiện / Combo (Bấm vào để xem)", expanded=True):
+# Hướng dẫn quy tắc đặt mã
+with st.expander("📌 Hướng dẫn quy tắc đặt Mã Linh Kiện / Combo (Bấm vào để xem)", expanded=False):
     st.markdown("""
-    Để đảm bảo tính đồng bộ và dễ tra cứu cho toàn hệ thống, vui lòng tuân thủ cấu trúc tạo mã sau:
-    * **Linh kiện lẻ:** `LK-[Nhóm]-[TênViếtTắt]-[SốThứTự]` (Ví dụ: `LK-IC-NE555-01`, `LK-RES-10K-05`)
-    * **Combo sản phẩm:** `CB-[TênGói]-[PhiênBản]` (Ví dụ: `CB-ARDUINO-V1`, `CB-SOLDER-KIT-02`)
-    * **Lưu ý:** Mã không được trùng lặp, viết hoa không dấu và không chứa khoảng trắng.
+    * **Linh kiện lẻ:** `LK-[Nhóm]-[TênViếtTắt]-[SốThứTự]` (Ví dụ: `LK-IC-NE555-01`)
+    * **Combo sản phẩm:** `CB-[TênGói]-[PhiênBản]` (Ví dụ: `CB-ARDUINO-V1`)
     """)
-# -----------------------------------------------------
 with st.form("add_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
     with col1:
         ma_lk = st.text_input("Mã linh kiện / Combo (VD: LK-IC-01)")
         ten_lk = st.text_input("Tên linh kiện / Combo")
         so_luong = st.number_input("Số lượng", min_value=0, step=1)
+        # Nút chọn đơn vị tính dạng dropdown
+        don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Cái", "Túi", "Combo", "Cuộn", "Hộp", "Chiếc"])
     with col2:
-        don_vi = st.text_input("Đơn vị tính (Cái, Bộ, Combo...)")
-        nhat_ky = st.text_input("Nhật ký xuất nhập")
-        hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
+        # Nút chọn loại giao dịch: Nhập hay Xuất
+        loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "📤 Xuất kho", "🔄 Cập nhật thông tin"])
+        # Ngày tháng tự động lấy theo ngày hiện tại hệ thống
+        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+        ghi_chu_tay = st.text_input("Ghi chú thêm (tùy chọn)", placeholder="Ví dụ: Nhập hàng từ nhà cung cấp A")      
+        hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")    
     save_btn = st.form_submit_button("Lưu dữ liệu vào Database")
     if save_btn:
         if ma_lk and ten_lk:
             try:
+                # Tự động gom thành chuỗi nhật ký kèm thời gian thực tế
+                nhat_ky_str = f"[{ngay_hien_tai}] {loai_gd}: {so_luong} {don_vi}"
+                if ghi_chu_tay:
+                    nhat_ky_str += f" - {ghi_chu_tay}"
                 new_data = {
                     "ma_lk": ma_lk,
                     "ten_lk": ten_lk,
                     "so_luong": int(so_luong),
                     "don_vi": don_vi,
-                    "nhat_ky": nhat_ky,
+                    "nhat_ky": nhat_ky_str,
                     "hinh_anh": hinh_anh
-                }
-                supabase.table("Ton_kho").insert(new_data).execute()
+                }            
+                # Thực hiện lưu lên Supabase
+                supabase.table("Ton_kho").upsert(new_data).execute()
                 st.success("Đã lưu dữ liệu thành công lên hệ thống vĩnh viễn!")
                 st.rerun()
             except Exception as e:
