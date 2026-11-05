@@ -179,7 +179,7 @@ with main_col:
         st.markdown("---")
         if not df.empty:
             # Dòng 1: Chọn mã linh kiện cần xuất (Bên ngoài form để tương tác trực tiếp cập nhật dòng 2)
-            selected_export_item = st.selectbox("1️⃣ Chọn mã linh kiện cần xuất", df["Ma_LK"].tolist())
+            selected_export_item = st.selectbox("1️⃣ Nhập mã linh kiện cần xuất", df["Ma_LK"].tolist())
             # Lấy thông tin tương ứng với mã vừa chọn ở dòng 1
             current_item_row = df[df["Ma_LK"] == selected_export_item].iloc[0]
             hien_thi_ten = current_item_row["Ten_LK"]
