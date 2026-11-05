@@ -154,7 +154,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO
+    # 3. NHẬP MỚI COMBO (Đã fix tự động load đầy đủ thành phần cũ để chỉnh sửa/xóa bỏ)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -200,21 +200,24 @@ with main_col:
             ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo")
             st.markdown("---")
             st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Hiển thị theo chiều dọc, hỗ trợ tối đa 10 linh kiện)")
-            st.info("💡 Mỗi dòng gồm: Mã linh kiện/vật tư, Định mức số lượng và Link hình ảnh thành phần.")
+            st.info("💡 Mỗi dòng gồm: Mã linh kiện/vật tư, Định mức số lượng và Link hình ảnh thành phần. (Có thể sửa đổi hoặc để trống để xóa)")
             def get_tp_val(idx, field):
                 if idx < len(def_tp):
-                    return def_tp[idx].get(field, "")
+                    val = def_tp[idx].get(field, "")
+                    return val if val is not None else ""
                 return ""
             tps_input = []
             for i in range(1, 11):
                 st.markdown(f"**Thành phần {i}**")
                 col_m, col_s, col_i = st.columns([2, 1, 2])
                 with col_m:
-                    m_val = st.text_input(f"Mã LK/VT {i}", value=get_tp_val(i-1, 'ma'), key=f"tp{i}_m")
+                    m_val = st.text_input(f"Mã LK/VT {i}", value=str(get_tp_val(i-1, 'ma')), key=f"tp{i}_m")
                 with col_s:
-                    s_val = st.number_input(f"Định mức {i}", min_value=1, value=int(get_tp_val(i-1, 'sl')) if get_tp_val(i-1, 'sl') else 1, key=f"tp{i}_s")
+                    s_raw = get_tp_val(i-1, 'sl')
+                    s_default = int(s_raw) if str(s_raw).isdigit() else 1
+                    s_val = st.number_input(f"Định mức {i}", min_value=1, value=s_default, key=f"tp{i}_s")
                 with col_i:
-                    i_val = st.text_input(f"Link ảnh LK {i} (URL)", value=get_tp_val(i-1, 'img'), key=f"tp{i}_i")
+                    i_val = st.text_input(f"Link ảnh LK {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"tp{i}_i")
                 st.markdown("---")
                 tps_input.append((m_val, s_val, i_val))
             danh_sach_thanh_phan = []
@@ -598,20 +601,17 @@ with main_col:
                 st.warning("Hiện chưa có mã linh kiện/vật tư nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 8. BÁO CÁO & XUẤT EXCEL (TÍNH NĂNG MỚI NÂNG CẤP THƯƠNG MẠI HÓA)
+    # 8. BÁO CÁO & XUẤT EXCEL
     elif menu_choice == "📈 Báo cáo & Xuất Excel":
         st.title("📈 BÁO CÁO KHO & XUẤT FILE EXCEL")
         st.markdown("---")
         st.info("💡 Bạn có thể tải toàn bộ dữ liệu tồn kho và nhật ký nhập/xuất kho dưới dạng file **Excel (.xlsx)** để lưu trữ hoặc phục vụ kiểm kê hàng tháng.")
         if not df.empty:
-            # Tạo file Excel dạng byte bằng pandas và openpyxl
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Tab 1: Bảng tồn kho hiện tại
                 df_ton_kho = df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi"]].copy()
                 df_ton_kho.columns = ["Mã Sản Phẩm / Combo", "Tên Sản Phẩm", "Số Lượng Tồn Kho", "Đơn Vị Tính"]
                 df_ton_kho.to_excel(writer, sheet_name='Ton_Kho_Hien_Tai', index=False)
-                # Tab 2: Lịch sử Nhật ký nhập/xuất
                 df_nhat_ky = df[["Ma_LK", "Ten_LK", "Nhat_ky"]].copy()
                 df_nhat_ky.columns = ["Mã Sản Phẩm", "Tên Sản Phẩm", "Lịch Sử Nhật Ký Chi Tiết"]
                 df_nhat_ky.to_excel(writer, sheet_name='Lich_Su_Nhat_Ky', index=False)
