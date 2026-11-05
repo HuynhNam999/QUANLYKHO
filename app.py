@@ -23,20 +23,23 @@ df = load_data()
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
+    st.session_state.username = None
 if not st.session_state.logged_in:
     st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ KHO")
     with st.form("login_form"):
-        username = st.text_input("Tên đăng nhập")
+        username_input = st.text_input("Tên đăng nhập")
         password = st.text_input("Mật khẩu", type="password")
         submit_btn = st.form_submit_button("Đăng nhập")
         if submit_btn:
-            if username == "admin" and password == "123456":
+            if username_input == "admin" and password == "123456":
                 st.session_state.logged_in = True
                 st.session_state.role = "Admin"
+                st.session_state.username = "Quản trị viên (Admin)"
                 st.rerun()
-            elif username == "nhanvien" and password == "123456":
+            elif username_input == "nhanvien" and password == "123456":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
+                st.session_state.username = "Nhân viên kho"
                 st.rerun()
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
@@ -45,8 +48,9 @@ st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 if st.sidebar.button("Đăng xuất"):
     st.session_state.logged_in = False
     st.session_state.role = None
+    st.session_state.username = None
     st.rerun()
-st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO")
+st.title("📦 QUẢN LÝ KHO LINH KIỆN & COMBO VĨNH VIỄN")
 st.subheader("📊 Bảng Tồn Kho & Chi Tiết")
 if not df.empty:
     st.dataframe(df, use_container_width=True)
@@ -60,7 +64,7 @@ if not df.empty:
             st.write(f"**Mã LK:** {item_row.get('Ma_LK', '')}")
             st.write(f"**Tên LK:** {item_row.get('Ten_LK', '')}")
             st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
-            st.write(f"**Nhật ký xuất nhập:** {item_row.get('Nhat_ky', 'Chưa có nhật ký')}")
+            st.write(f"**Nhật ký thao tác gần nhất:** {item_row.get('Nhat_ky', 'Chưa có nhật ký')}")
         with col2:
             img_url = item_row.get('Hinh_anh', '')
             if img_url and str(img_url).startswith("http"):
@@ -69,7 +73,6 @@ if not df.empty:
                 st.info("Chưa có link hình ảnh cho linh kiện/combo này.")
 else:
     st.info("Kho hiện đang trống. Hãy thêm linh kiện mới bên dưới!")
-
 st.markdown("---")
 st.subheader("➕ Thêm / Cập Nhật Linh Kiện & Combo Mới")
 # Hướng dẫn quy tắc đặt mã
@@ -88,15 +91,17 @@ with st.form("add_form", clear_on_submit=True):
     with col2:
         loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "📤 Xuất kho", "🔄 Cập nhật thông tin"])
         ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
-        ghi_chu_tay = st.text_input("Ghi chú thêm (tùy chọn)", placeholder="Ví dụ: Nhập hàng từ nhà cung cấp A")
+        ghi_chu_tay = st.text_input("Ghi chú thêm (tùy chọn)", placeholder="Ví dụ: Kiểm kê định kỳ tháng này")
         hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)")
     save_btn = st.form_submit_button("Lưu dữ liệu vào Database")
     if save_btn:
         if ma_lk and ten_lk:
             try:
-                nhat_ky_str = f"[{ngay_hien_tai}] {loai_gd}: {so_luong} {don_vi}"
+                # Tự động gộp: [Thời gian] [Người thực hiện] - [Loại thao tác]: [Số lượng] [Đơn vị] - [Ghi chú]
+                nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                nhat_ky_str = f"[{ngay_hien_tai}] 👤 {Nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
                 if ghi_chu_tay:
-                    nhat_ky_str += f" - {ghi_chu_tay}"
+                    nhat_ky_str += f" | Ghé chú: {ghi_chu_tay}"
                 new_data = {
                     "Ma_LK": ma_lk,
                     "Ten_LK": ten_lk,
@@ -104,9 +109,9 @@ with st.form("add_form", clear_on_submit=True):
                     "Don_vi": don_vi,
                     "Nhat_ky": nhat_ky_str,
                     "Hinh_anh": hinh_anh
-                }               
+                }                
                 supabase.table("Ton_kho").upsert(new_data).execute()
-                st.success("Đã lưu dữ liệu thành công lên hệ thống vĩnh viễn!")
+                st.success("Đã ghi nhận lịch sử và lưu dữ liệu thành công vĩnh viễn!")
                 st.rerun()
             except Exception as e:
                 st.error(f"Lỗi khi lưu dữ liệu: {e}")
