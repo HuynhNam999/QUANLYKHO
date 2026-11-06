@@ -40,7 +40,6 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     clean_no_accent = remove_vietnamese_accent(full_name.strip())
     upper_name = clean_no_accent.upper()
     if is_combo:
-        # Lấy tối đa các chữ cái đầu hoặc từ khóa để làm mã combo rõ nghĩa
         clean_code = re.sub(r'[^A-Z0-9]', '_', upper_name)
         clean_code = re.sub(r'_+', '_', clean_code).strip('_')
         parts = clean_code.split('_')
@@ -50,7 +49,6 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
             short_str = clean_code
         return f"CB-{short_str[:25]}"
     prefix = item_type if item_type in ["LK", "VT"] else "VT"
-    # Làm sạch tên để đưa vào mã cho dễ hiểu, không quá vắn tắt
     clean_code = re.sub(r'[^A-Z0-9]', '_', upper_name)
     clean_code = re.sub(r'_+', '_', clean_code).strip('_')
     auto_code = f"{prefix}-{clean_code[:30]}"
@@ -236,7 +234,7 @@ with main_col:
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
             cb_ma_mode = st.radio(
                 "Phương thức mã Combo:",
-                ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
+                ["🤖 Tự sinh", "✍️ Tự viết"],
                 horizontal=True,
                 key="cb_ma_mode_radio"
             )
@@ -300,7 +298,7 @@ with main_col:
             with sub_type_col2:
                 tp_ma_choice = st.radio(
                     f"Phương thức mã cho Thành phần {i}:",
-                    ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
+                    ["🤖 Tự sinh", "✍️ Tự viết"],
                     horizontal=True,
                     key=f"tp{i}_method_radio"
                 )
@@ -388,11 +386,14 @@ with main_col:
                 st.session_state.le_ma_input_val = row_data.get("Ma_LK", "")
                 st.session_state.le_dv_input_val = row_data.get("Don_vi", "Cái")
                 st.session_state.le_img_input_val = row_data.get("Hinh_anh", "")
+                # Khi chọn item cũ, tự động chuyển phương thức mã sang "Tự viết" để hiển thị đúng mã cũ
+                st.session_state.single_item_method_radio = "✍️ Tự viết"
             else:
                 st.session_state.le_ten_input_val = ""
                 st.session_state.le_ma_input_val = ""
                 st.session_state.le_dv_input_val = "Cái"
                 st.session_state.le_img_input_val = ""
+                st.session_state.single_item_method_radio = "🤖 Tự sinh"
         selected_existing = st.selectbox(
             "🔍 Chọn mã linh kiện/vật tư có sẵn (hoặc chọn 'Tạo mới')", 
             existing_items,
@@ -435,12 +436,14 @@ with main_col:
                 )
             prefix_type_le = "LK" if "LK" in item_cat_le else "VT"
             auto_code_le = generate_code_from_name(st.session_state.le_ten_input_val, is_combo=False, item_type=prefix_type_le)
+            # Nếu chọn "Tự sinh": hiển thị mã tự động tính toán theo tên
+            # Nếu chọn "Tự viết": hiển thị mã cá nhân tự viết hoặc cho phép chỉnh sửa
             if item_method_le.startswith("🤖"):
-                show_code = auto_code_le if auto_code_le else st.session_state.le_ma_input_val
-                ma_lk = st.text_input("Mã LK / VT (Tự động sinh rõ nghĩa)", value=show_code, key="le_code_auto_show")
+                ma_lk = st.text_input("Mã LK / VT (Tự động sinh rõ nghĩa)", value=auto_code_le, key="le_code_auto_show")
             else:
-                show_code = st.session_state.le_ma_input_val if st.session_state.le_ma_input_val else auto_code_le
-                ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=show_code, key="le_code_manual_show")
+                manual_default = st.session_state.le_ma_input_val if st.session_state.le_ma_input_val else auto_code_le
+                ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=manual_default, key="le_code_manual_show")
+                st.session_state.le_ma_input_val = ma_lk
             so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0, key="le_sl_input")
         with c2:
             dv_list_le = ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét", "Bộ"]
