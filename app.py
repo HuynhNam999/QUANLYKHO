@@ -125,11 +125,23 @@ with main_col:
             st.dataframe(styled_df, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm linh kiện mới ở mục bên trái!")
-    # 2. TRA CỨU & LỌC CHI TIẾT
+    # 2. TRA CỨU & LỌC CHI TIẾT (Tích hợp quét Barcode tìm kiếm nhanh)
     elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
         st.title("🔍 TRA CỨU & LỌC CHI TIẾT SẢN PHẨM")
         st.markdown("---")
         if not df.empty:
+            col_sc1, col_sc2 = st.columns([2, 2])
+            with col_sc1:
+                barcode_search = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để tra cứu nhanh", placeholder="Nhấn vào đây rồi quét mã vạch...")
+            # Nếu người dùng quét Barcode, tự động lọc ra mã linh kiện tương ứng
+            target_ma_lk = None
+            if barcode_search.strip():
+                matched_bc = df[df["Barcode"].str.contains(barcode_search.strip(), case=False, na=False)]
+                if not matched_bc.empty:
+                    target_ma_lk = matched_bc.iloc[0]["Ma_LK"]
+                    st.success(f"✨ Đã tìm thấy sản phẩm qua mã vạch: **{matched_bc.iloc[0]['Ten_LK']}** (`{target_ma_lk}`)")
+                else:
+                    st.warning("⚠️ Không tìm thấy sản phẩm nào khớp với mã vạch này.")
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
                 loai_loc = st.selectbox(
@@ -137,7 +149,9 @@ with main_col:
                     ["Tất cả", "📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"]
                 )
             with col_f2:
-                selected_item = st.selectbox("Chọn mã linh kiện", df["Ma_LK"].tolist())
+                ma_list = df["Ma_LK"].tolist()
+                default_idx = ma_list.index(target_ma_lk) if target_ma_lk in ma_list else 0
+                selected_item = st.selectbox("Chọn mã linh kiện", ma_list, index=default_idx)
             with col_f3:
                 bat_tat_ngay = st.checkbox("Lọc theo ngày cụ thể")
                 ngay_chon = st.date_input("Chọn ngày", value=date.today())
@@ -257,11 +271,9 @@ with main_col:
                 ma_lk = st.text_input("Mã Combo (Mã tự động từ hệ thống)", value=auto_cb_code, key="cb_code_auto_val")
             else:
                 ma_lk = st.text_input("Mã Combo (Cá nhân tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val")
-            # Chọn đơn vị nhập và quy cách
             don_vi_nhap = st.selectbox("Đơn vị giao dịch khi nhập", ["Đơn vị lẻ (Cái/Bộ)", "📦 Kiện (Đóng thùng)"], key="cb_dv_nhap")
             so_luong_nhap = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="cb_sl_input")
             quy_cach = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach, key="cb_quycach_input")
-            # Tính số lượng thực tế cộng vào kho
             so_luong_thuc_te = so_luong_nhap * quy_cach if don_vi_nhap.startswith("📦") else so_luong_nhap
             barcode = st.text_input("Mã vạch (Barcode)", value=def_barcode, placeholder="Quét hoặc nhập mã vạch...", key="cb_barcode_input")
         with c2:
@@ -640,15 +652,32 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 6. XUẤT KHO COMBO
+    # 6. XUẤT KHO COMBO (Tích hợp quét Barcode xuất nhanh)
     elif menu_choice == "📤 Xuất kho Combo":
         st.title("📤 XUẤT KHO COMBO (Tự động trừ định mức linh kiện/vật tư con)")
         st.markdown("---")
         if not df.empty:
             combo_df = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             if not combo_df.empty:
+                col_ex_sc1, col_ex_sc2 = st.columns([2, 2])
+                with col_ex_sc1:
+                    barcode_export_cb = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để chọn Combo xuất", placeholder="Quét mã vạch sản phẩm...")
+                target_cb_ma = None
+                if barcode_export_cb.strip():
+                    matched_cb_bc = combo_df[combo_df["Barcode"].str.contains(barcode_export_cb.strip(), case=False, na=False)]
+                    if not matched_cb_bc.empty:
+                        target_cb_ma = matched_cb_bc.iloc[0]["Ma_LK"]
+                        st.success(f"✨ Đã nhận diện Combo: **{matched_cb_bc.iloc[0]['Ten_LK']}** (`{target_cb_ma}`)")
+                    else:
+                        st.warning("⚠️ Không tìm thấy Combo nào khớp với mã vạch này.")
                 export_options = [f"{row['Ma_LK']} - {row['Ten_LK']}" for _, row in combo_df.iterrows()]
-                selected_export_opt = st.selectbox("1️⃣ Chọn Combo cần xuất kho", export_options)
+                default_cb_idx = 0
+                if target_cb_ma:
+                    for idx, opt in enumerate(export_options):
+                        if opt.startswith(target_cb_ma):
+                            default_cb_idx = idx
+                            break
+                selected_export_opt = st.selectbox("1️⃣ Chọn Combo cần xuất kho", export_options, index=default_cb_idx)
                 selected_export_item = selected_export_opt.split(" - ")[0]
                 current_item_row = df[df["Ma_LK"] == selected_export_item].iloc[0]
                 hien_thi_ten = current_item_row["Ten_LK"]
@@ -678,7 +707,6 @@ with main_col:
                         so_luong_xuat_raw = st.number_input("Số lượng xuất", min_value=1, step=1, value=1)
                     with col_ex2:
                         ngay_xuat = st.date_input("Ngày xuất", value=date.today())
-                    # Quy đổi nếu xuất theo kiện
                     so_luong_xuat = so_luong_xuat_raw * quy_cach_cb if don_vi_xuat_cb.startswith("📦") else so_luong_xuat_raw
                     if don_vi_xuat_cb.startswith("📦"):
                         st.info(f"💡 Quy đổi xuất: {so_luong_xuat_raw} Kiện x {quy_cach_cb} = {so_luong_xuat} {don_vi_tinh}")
@@ -726,7 +754,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 7. XUẤT KHO LINH KIỆN LẺ
+    # 7. XUẤT KHO LINH KIỆN LẺ (Tích hợp quét Barcode xuất nhanh)
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
         st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập & Thành phần)")
         st.markdown("---")
@@ -739,9 +767,10 @@ with main_col:
                 sl = row["So_luong"]
                 img = row.get("Hinh_anh", "")
                 qc = int(row.get("Quy_cach", 1))
+                bc = row.get("Barcode", "")
                 if not m.startswith(("CB", "CM")):
                     if m not in all_items_dict:
-                        all_items_dict[m] = {"Ten_LK": t, "So_luong": sl, "Don_vi": dv, "Hinh_anh": img, "Quy_cach": qc}
+                        all_items_dict[m] = {"Ten_LK": t, "So_luong": sl, "Don_vi": dv, "Hinh_anh": img, "Quy_cach": qc, "Barcode": bc}
                 tp_list = row.get("Thanh_phan", [])
                 if tp_list and isinstance(tp_list, list):
                     for tp in tp_list:
@@ -756,7 +785,8 @@ with main_col:
                                     "So_luong": sub_match.iloc[0]["So_luong"],
                                     "Don_vi": sub_match.iloc[0]["Don_vi"],
                                     "Hinh_anh": sub_match.iloc[0].get("Hinh_anh", ""),
-                                    "Quy_cach": int(sub_match.iloc[0].get("Quy_cach", 1))
+                                    "Quy_cach": int(sub_match.iloc[0].get("Quy_cach", 1)),
+                                    "Barcode": sub_match.iloc[0].get("Barcode", "")
                                 }
                             else:
                                 all_items_dict[sub_m] = {
@@ -764,11 +794,30 @@ with main_col:
                                     "So_luong": 0,
                                     "Don_vi": sub_dv,
                                     "Hinh_anh": tp.get("img", ""),
-                                    "Quy_cach": 1
+                                    "Quy_cach": 1,
+                                    "Barcode": ""
                                 }
+            col_ex_sc3, col_ex_sc4 = st.columns([2, 2])
+            with col_ex_sc3:
+                barcode_export_le = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để chọn linh kiện xuất", placeholder="Quét mã vạch sản phẩm...")
+            target_le_ma = None
+            if barcode_export_le.strip():
+                for m, info in all_items_dict.items():
+                    if info["Barcode"] and barcode_export_le.strip().lower() in info["Barcode"].lower():
+                        target_le_ma = m
+                        st.success(f"✨ Đã nhận diện: **{info['Ten_LK']}** (`{target_le_ma}`)")
+                        break
+                if not target_le_ma:
+                    st.warning("⚠️ Không tìm thấy linh kiện nào khớp với mã vạch này.")
             export_options = [f"{m} - {info['Ten_LK']}" for m, info in all_items_dict.items()]
+            default_le_idx = 0
+            if target_le_ma:
+                for idx, opt in enumerate(export_options):
+                    if opt.startswith(target_le_ma):
+                        default_le_idx = idx
+                        break
             if export_options:
-                selected_export_opt = st.selectbox("1️⃣ Chọn linh kiện / vật tư cần xuất kho", export_options)
+                selected_export_opt = st.selectbox("1️⃣ Chọn linh kiện / vật tư cần xuất kho", export_options, index=default_le_idx)
                 selected_export_item = selected_export_opt.split(" - ")[0]
                 current_info = all_items_dict[selected_export_item]
                 hien_thi_ten = current_info["Ten_LK"]
