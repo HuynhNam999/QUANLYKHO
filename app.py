@@ -33,7 +33,6 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     if is_combo:
         name_code = "".join([c for c in upper_name if c.isalnum()])[:6]
         return f"CB-{name_code}" if name_code else "CB-01"
-    # Lấy tiền tố do người dùng chọn: "LK" hoặc "VT" (hoặc tự nhận diện nếu muốn)
     prefix = item_type if item_type in ["LK", "VT"] else "VT"
     size_match = re.search(r'M\d+(?:[xX]\d+)?', upper_name)
     size_str = size_match.group(0).replace('X', 'x') if size_match else "GENERAL"
@@ -227,7 +226,7 @@ with main_col:
         st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
         c1, c2 = st.columns(2)
         with c1:
-            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn gỗ lim")
+            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn ăn 4 ghế")
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
             cb_ma_mode = st.radio(
                 "Phương thức mã Combo:",
@@ -236,7 +235,7 @@ with main_col:
                 key="cb_ma_mode_radio"
             )
             if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo (Bắt đầu bằng CB)", value=auto_cb_code, disabled=True, key="cb_code_display_auto")
+                ma_lk = st.text_input("Mã Combo (Bắt đầu bằng CB)", value=auto_cb_code, key="cb_code_display_auto")
             else:
                 ma_lk = st.text_input("Mã Combo (Tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_display_manual")
             so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
@@ -265,7 +264,7 @@ with main_col:
                     f"Tên đầy đủ linh kiện/vật tư {i}", 
                     value=str(get_tp_val(i-1, 'ten')), 
                     key=f"live_tp{i}_ten", 
-                    placeholder="VD: Bulong 4.6 mạ nhúng nóng M12x40"
+                    placeholder="VD: Bulong 8.8 mạ nhúng nóng M12x40"
                 )
             with sub_c2:
                 t_sl = st.number_input(
@@ -274,7 +273,6 @@ with main_col:
                     value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, 
                     key=f"live_tp{i}_s"
                 )
-            # Thêm nút chọn loại: Linh kiện (LK) hay Vật tư (VT)
             sub_type_col1, sub_type_col2 = st.columns(2)
             with sub_type_col1:
                 item_cat = st.radio(
@@ -296,8 +294,7 @@ with main_col:
             sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
                 if tp_ma_choice.startswith("🤖"):
-                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i}", value=auto_generated_code, disabled=True, key=f"live_tp{i}_code_auto")
-                    final_tp_code = auto_generated_code
+                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i}", value=auto_generated_code, key=f"live_tp{i}_code_auto")
                 else:
                     final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Tự viết)", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual")
             with sub_c4:
