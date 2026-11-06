@@ -24,13 +24,13 @@ def load_data():
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
 df = load_data()
-# Hàm thông minh tự động sinh mã cơ khí từ tên sản phẩm
+# Hàm thông minh tự động sinh mã cơ khí ngay lập tức từ tên sản phẩm
 def generate_code_from_name(full_name):
     if not full_name:
         return ""
     name_clean = full_name.strip()
     upper_name = name_clean.upper()
-    # 1. Xác định tiền tố loại (TAN hoặc BL hoặc VT...)
+    # 1. Xác định tiền tố loại (TAN, BL, VIT, LD, VT...)
     prefix = "VT"
     if "TÁN" in upper_name or "Ê-CU" in upper_name or "ECU" in upper_name:
         prefix = "TAN"
@@ -58,7 +58,6 @@ def generate_code_from_name(full_name):
         surface_code = "_NGANH"
     # Tổng hợp thành mã chuẩn độc nhất
     auto_code = f"{prefix}-{size_str}{grade_str}{surface_code}"
-    # Loại bỏ ký tự thừa nếu có
     auto_code = re.sub(r'[\s_]+', '_', auto_code).strip('_').upper()
     return auto_code
 # Quản lý đăng nhập hệ thống
@@ -194,7 +193,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Tích hợp tự động sinh mã thông minh từ tên gọi cơ khí)
+    # 3. NHẬP MỚI COMBO (Đã tối ưu ô mã tự động nhảy ngay lập tức khi gõ tên)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -234,96 +233,102 @@ with main_col:
         def_dv = active_data.get("Don_vi", "Bộ") if active_data and active_data.get("Don_vi") in ["Bộ", "Hộp", "Combo"] else "Bộ"
         def_img = active_data.get("Hinh_anh", "") if active_data and active_data.get("Hinh_anh") else ""
         def_tp = active_data.get("Thanh_phan", []) if active_data else []
-        with st.form("add_combo_form", clear_on_submit=False):
-            st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
-            c1, c2 = st.columns(2)
-            with c1:
-                ma_lk = st.text_input("Mã Combo (VD: CB-MVRS-01)", value=def_ma)
-                ten_lk = st.text_input("Tên Combo", value=def_ten)
-                so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0)
-            with c2:
-                don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0)
-                loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
-                hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
-            if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
-                existing_cb_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (Tên: *{existing_cb_row['Ten_LK']}*, Tồn: *{existing_cb_row['So_luong']}*).")
-            ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo")
+        st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
+        c1, c2 = st.columns(2)
+        with c1:
+            ma_lk = st.text_input("Mã Combo (VD: CB-MVRS-01)", value=def_ma, key="cb_ma_input")
+            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input")
+            so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
+        with c2:
+            don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input")
+            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="cb_op_input")
+            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img, key="cb_img_input")
+        if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
+            existing_cb_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (Tên: *{existing_cb_row['Ten_LK']}*, Tồn: *{existing_cb_row['So_luong']}*).")
+        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo", key="cb_note_input")
+        st.markdown("---")
+        st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN (Mã tự động sinh ngay lập tức khi bạn gõ tên)")
+        st.info("💡 Ví dụ bạn gõ: `Bulong 10.9 mạ dacromet M24x115`, hệ thống tự sinh mã ngay ô bên cạnh.")
+        def get_tp_val(idx, field):
+            if idx < len(def_tp) and isinstance(def_tp, list):
+                val = def_tp[idx].get(field, "")
+                return val if val is not None else ""
+            return ""
+        tps_input = []
+        generated_codes_in_form = []
+        for i in range(1, 11):
+            st.markdown(f"**Thành phần {i}**")
+            sub_c1, sub_c2 = st.columns([3, 1])
+            with sub_c1:
+                t_name = st.text_input(
+                    f"Tên đầy đủ linh kiện/vật tư {i}", 
+                    value=str(get_tp_val(i-1, 'ten')), 
+                    key=f"live_tp{i}_ten", 
+                    placeholder="VD: Bulong 10.9 mạ dacromet M24x115"
+                )
+            with sub_c2:
+                t_sl = st.number_input(
+                    f"Định mức {i}", 
+                    min_value=1, 
+                    value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, 
+                    key=f"live_tp{i}_s"
+                )
+            # Tự động gọi hàm phân tích tên để sinh mã chuẩn trực tiếp
+            auto_generated_code = generate_code_from_name(t_name)
+            sub_c3, sub_c4 = st.columns([3, 1])
+            with sub_c3:
+                t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i")
+            with sub_c4:
+                st.text_input(f"Mã tự động {i}", value=auto_generated_code, disabled=True, key=f"live_tp{i}_code")
+            if auto_generated_code:
+                if auto_generated_code in generated_codes_in_form:
+                    st.error(f"⚠️ **Trùng mã nội bộ:** Mã `{auto_generated_code}` bị trùng với thành phần bên trên!")
+                elif not df.empty and auto_generated_code in df["Ma_LK"].values:
+                    matched_dup = df[df["Ma_LK"] == auto_generated_code].iloc[0]
+                    st.info(f"ℹ️ **Thông báo:** Mã tự động `{auto_generated_code}` khớp với vật tư đã có trong kho (*{matched_dup['Ten_LK']}* - Tồn: *{matched_dup['So_luong']}*).")
+            generated_codes_in_form.append(auto_generated_code)
             st.markdown("---")
-            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN (Chỉ cần nhập tên, hệ thống tự sinh mã chuẩn cơ khí)")
-            st.info("💡 Ví dụ bạn gõ: `Bulong 10.9 mạ dacromet M24x115`, hệ thống sẽ tự bóc tách và sinh ra mã chuẩn.")
-            def get_tp_val(idx, field):
-                if idx < len(def_tp) and isinstance(def_tp, list):
-                    val = def_tp[idx].get(field, "")
-                    return val if val is not None else ""
-                return ""
-            tps_input = []
-            generated_codes_in_form = []
-            for i in range(1, 11):
-                st.markdown(f"**Thành phần {i}**")
-                sub_c1, sub_c2 = st.columns([3, 1])
-                with sub_c1:
-                    t_name = st.text_input(f"Tên đầy đủ linh kiện/vật tư {i}", value=str(get_tp_val(i-1, 'ten')), key=f"tp{i}_ten", placeholder="VD: Bulong 10.9 mạ dacromet M24x115")
-                with sub_c2:
-                    t_sl = st.number_input(f"Định mức {i}", min_value=1, value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, key=f"tp{i}_s")
-                sub_c3, sub_c4 = st.columns([3, 1])
-                with sub_c3:
-                    t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"tp{i}_i")
-                # Tự động gọi hàm phân tích tên để sinh mã chuẩn
-                auto_generated_code = generate_code_from_name(t_name)
-                if auto_generated_code:
-                    if auto_generated_code in generated_codes_in_form:
-                        st.error(f"⚠️ **Trùng mã nội bộ:** Mã `{auto_generated_code}` bị trùng với một thành phần khác bên trên!")
-                    elif not df.empty and auto_generated_code in df["Ma_LK"].values:
-                        matched_dup = df[df["Ma_LK"] == auto_generated_code].iloc[0]
-                        st.info(f"ℹ️ **Thông báo:** Mã tự động `{auto_generated_code}` khớp với mã vật tư đã có trong kho (*{matched_dup['Ten_LK']}* - Tồn: *{matched_dup['So_luong']}*).")
-                generated_codes_in_form.append(auto_generated_code)
-                with sub_c4:
-                    st.text_input(f"Mã tự động {i}", value=auto_generated_code, disabled=True, key=f"tp{i}_autocode")
-                st.markdown("---")
-                tps_input.append({
-                    "ten": t_name,
-                    "ma": auto_generated_code,
-                    "sl": int(t_sl),
-                    "img": t_img.strip() if t_img else ""
-                })
-            danh_sach_thanh_phan = []
-            for item in tps_input:
-                if item["ten"] and item["ten"].strip() != "":
-                    danh_sach_thanh_phan.append(item)
-            save_btn = st.form_submit_button("💾 Lưu Cấu Hình Combo vào Database")
-            if save_btn:
-                if ma_lk and ten_lk:
-                    try:
-                        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
-                        nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                        nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
-                        if ghi_chu_tay:
-                            nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
-                        if not df.empty and ma_lk in df["Ma_LK"].values:
-                            old_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-                            if loai_gd == "📥 Nhập kho mới":
-                                so_luong = int(old_row["So_luong"]) + int(so_luong)
-                            old_logs = old_row.get("Nhat_ky", "")
-                            if old_logs:
-                                nhat_ky_str = old_logs + "\n" + nhat_ky_str
-                        new_data = {
-                            "Ma_LK": ma_lk,
-                            "Ten_LK": ten_lk,
-                            "So_luong": int(so_luong),
-                            "Don_vi": don_vi,
-                            "Nhat_ky": nhat_ky_str,
-                            "Hinh_anh": hinh_anh,
-                            "Thanh_phan": danh_sach_thanh_phan
-                        }
-                        supabase.table("Ton_kho").upsert(new_data).execute()
-                        st.session_state.edit_combo_data = None
-                        st.success("Đã lưu thành công dữ liệu Combo và đồng bộ mã linh kiện tự động vào Database!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Lỗi khi lưu dữ liệu: {e}")
-                else:
-                    st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
+            tps_input.append({
+                "ten": t_name,
+                "ma": auto_generated_code,
+                "sl": int(t_sl),
+                "img": t_img.strip() if t_img else ""
+            })
+        danh_sach_thanh_phan = [item for item in tps_input if item["ten"] and item["ten"].strip() != ""]
+        st.markdown("")
+        if st.button("💾 Lưu Cấu Hình Combo vào Database", type="primary", use_container_width=True):
+            if ma_lk and ten_lk:
+                try:
+                    ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
+                    if ghi_chu_tay:
+                        nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
+                    if not df.empty and ma_lk in df["Ma_LK"].values:
+                        old_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+                        if loai_gd == "📥 Nhập kho mới":
+                            so_luong = int(old_row["So_luong"]) + int(so_luong)
+                        old_logs = old_row.get("Nhat_ky", "")
+                        if old_logs:
+                            nhat_ky_str = old_logs + "\n" + nhat_ky_str
+                    new_data = {
+                        "Ma_LK": ma_lk,
+                        "Ten_LK": ten_lk,
+                        "So_luong": int(so_luong),
+                        "Don_vi": don_vi,
+                        "Nhat_ky": nhat_ky_str,
+                        "Hinh_anh": hinh_anh,
+                        "Thanh_phan": danh_sach_thanh_phan
+                    }
+                    supabase.table("Ton_kho").upsert(new_data).execute()
+                    st.session_state.edit_combo_data = None
+                    st.success("Đã lưu thành công dữ liệu Combo và đồng bộ mã linh kiện tự động vào Database!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Lỗi khi lưu dữ liệu: {e}")
+            else:
+                st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
     # 4. NHẬP MỚI LINH KIỆN LẺ
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
@@ -351,7 +356,6 @@ with main_col:
             c1, c2 = st.columns(2)
             with c1:
                 ten_lk = st.text_input("Tên linh kiện / vật tư", value=def_ten, placeholder="VD: Tán 10.9 M16")
-                # Tự động sinh mã dựa vào tên nhập vào
                 preview_code = generate_code_from_name(ten_lk) if not def_ma else def_ma
                 ma_lk = st.text_input("Mã LK / VT (Tự động sinh hoặc chỉnh sửa)", value=preview_code)
                 so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0)
