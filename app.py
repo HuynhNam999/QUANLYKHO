@@ -121,10 +121,12 @@ with main_col:
                         st.markdown("**🔗 Các linh kiện/vật tư thành phần trong bộ:**")
                         for tp in thanh_phan:
                             sub_m = tp.get('ma')
+                            sub_name = tp.get('ten', '')
                             sub_sl = tp.get('sl')
                             sub_img = tp.get('img', '')
                             sub_match = df[df["Ma_LK"] == sub_m]
-                            sub_name = sub_match.iloc[0]["Ten_LK"] if not sub_match.empty else ""
+                            if not sub_name and not sub_match.empty:
+                                sub_name = sub_match.iloc[0]["Ten_LK"]
                             st.write(f"- `{sub_m}` ({sub_name}) | Định mức: **{sub_sl}**")
                             if sub_img:
                                 st.image(sub_img, width=80)
@@ -153,8 +155,8 @@ with main_col:
             else:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
-            st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Đã fix lỗi cú pháp khi nạp dữ liệu cũ)
+            st.warning("Kho hiện đang trống.")
+    # 3. NHẬP MỚI COMBO (Tích hợp cảnh báo trùng mã Combo và trùng mã thành phần)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -205,37 +207,74 @@ with main_col:
                 don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0)
                 loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
                 hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
+            # CẢNH BÁO TRÙNG MÃ COMBO NGAY KHI NHẬP
+            if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
+                existing_cb_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (Tên: *{existing_cb_row['Ten_LK']}*, Tồn kho hiện tại: *{existing_cb_row['So_luong']} {existing_cb_row['Don_vi']}*). Nếu tiếp tục lưu, hệ thống sẽ cộng dồn số lượng hoặc cập nhật thông tin!")
             ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo")
             st.markdown("---")
-            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Hiển thị theo chiều dọc, hỗ trợ tối đa 10 linh kiện)")
-            st.info("💡 Mỗi dòng gồm: Mã linh kiện/vật tư, Định mức số lượng và Link hình ảnh thành phần. (Có thể sửa đổi hoặc để trống để xóa)")
+            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Hỗ trợ tối đa 10 thành phần)")
+            st.info("💡 Hệ thống tự động tổng hợp thông tin (Loại, Tên, Kích thước, Đặc điểm) để sinh ra **Mã linh kiện/vật tư tự động** chuẩn hóa.")
             def get_tp_val(idx, field):
                 if idx < len(def_tp) and isinstance(def_tp, list):
                     val = def_tp[idx].get(field, "")
                     return val if val is not None else ""
                 return ""
             tps_input = []
+            generated_codes_in_form = []
             for i in range(1, 11):
                 st.markdown(f"**Thành phần {i}**")
-                col_m, col_s, col_i = st.columns([2, 1, 2])
-                with col_m:
-                    m_val = st.text_input(f"Mã LK/VT {i}", value=str(get_tp_val(i-1, 'ma')), key=f"tp{i}_m")
-                with col_s:
-                    s_raw = get_tp_val(i-1, 'sl')
-                    s_default = int(s_raw) if str(s_raw).isdigit() else 1
-                    s_val = st.number_input(f"Định mức {i}", min_value=1, value=s_default, key=f"tp{i}_s")
-                with col_i:
-                    i_val = st.text_input(f"Link ảnh LK {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"tp{i}_i")
+                sub_c1, sub_c2, sub_c3 = st.columns([2, 1, 1])
+                with sub_c1:
+                    t_name = st.text_input(f"Tên gọi thành phần {i}", value=str(get_tp_val(i-1, 'ten')), key=f"tp{i}_ten", placeholder="VD: Ốc vít, Nắp chụp...")
+                with sub_c2:
+                    t_type = st.selectbox(f"Loại {i}", ["Linh kiện", "Vật tư"], index=0 if get_tp_val(i-1, 'phan_loai') != "Vật tư" else 1, key=f"tp{i}_loai")
+                with sub_c3:
+                    t_sl = st.number_input(f"Định mức {i}", min_value=1, value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, key=f"tp{i}_s")
+                sub_c4, sub_c5, sub_c6, sub_c7 = st.columns([1, 1, 1, 2])
+                with sub_c4:
+                    t_dai = st.text_input(f"Dài {i}", value=str(get_tp_val(i-1, 'dai')), key=f"tp{i}_dai", placeholder="VD: 50")
+                with sub_c5:
+                    t_rong = st.text_input(f"Rộng {i}", value=str(get_tp_val(i-1, 'rong')), key=f"tp{i}_rong", placeholder="VD: 20")
+                with sub_c6:
+                    t_cao = st.text_input(f"Cao {i}", value=str(get_tp_val(i-1, 'cao')), key=f"tp{i}_cao", placeholder="VD: 10")
+                with sub_c7:
+                    t_dac_biet = st.text_input(f"Chi tiết đặc biệt {i}", value=str(get_tp_val(i-1, 'dac_biet')), key=f"tp{i}_db", placeholder="VD: Có ren, Không nắp...")
+                sub_c8, sub_c9 = st.columns([3, 1])
+                with sub_c8:
+                    t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"tp{i}_i")
+                # Sinh mã tự động
+                prefix = "LK" if t_type == "Linh kiện" else "VT"
+                name_code = "".join([c for c in t_name.upper() if c.isalnum()])[:4] if t_name else "ITEM"
+                size_code = f"_{t_dai}x{t_rong}x{t_cao}" if (t_dai or t_rong or t_cao) else ""
+                db_code = f"_{"".join([c for c in t_dac_biet.upper() if c.isalnum()])[:6]}" if t_dac_biet else ""
+                auto_generated_code = f"{prefix}-{name_code}{size_code}{db_code}" if t_name else ""
+                # CẢNH BÁO TRÙNG MÃ THÀNH PHẦN (Trùng với mã đã có sẵn trong database hoặc trùng ngay trong form khai báo)
+                if auto_generated_code:
+                    if auto_generated_code in generated_codes_in_form:
+                        st.error(f"⚠️ **Trùng mã nội bộ:** Mã `{auto_generated_code}` bị trùng với một thành phần khác bên trên!")
+                    elif not df.empty and auto_generated_code in df["Ma_LK"].values:
+                        matched_dup = df[df["Ma_LK"] == auto_generated_code].iloc[0]
+                        st.info(f"ℹ️ **Thông báo:** Mã tự động `{auto_generated_code}` khớp với mã vật tư đã có trong kho (*{matched_dup['Ten_LK']}* - Tồn: *{matched_dup['So_luong']}*). Hệ thống sẽ liên kết đồng bộ.")
+                generated_codes_in_form.append(auto_generated_code)
+                with sub_c9:
+                    st.text_input(f"Mã tự động {i}", value=auto_generated_code, disabled=True, key=f"tp{i}_autocode")
                 st.markdown("---")
-                tps_input.append((m_val, s_val, i_val))
+                tps_input.append({
+                    "ten": t_name,
+                    "phan_loai": t_type,
+                    "dai": t_dai,
+                    "rong": t_rong,
+                    "cao": t_cao,
+                    "dac_biet": t_dac_biet,
+                    "ma": auto_generated_code,
+                    "sl": int(t_sl),
+                    "img": t_img.strip() if t_img else ""
+                })
             danh_sach_thanh_phan = []
-            for ma_con, sl, img_con in tps_input:
-                if ma_con and ma_con.strip() != "":
-                    danh_sach_thanh_phan.append({
-                        "ma": ma_con.strip(), 
-                        "sl": int(sl),
-                        "img": img_con.strip() if img_con else ""
-                    })
+            for item in tps_input:
+                if item["ten"] and item["ten"].strip() != "":
+                    danh_sach_thanh_phan.append(item)
             save_btn = st.form_submit_button("💾 Lưu Cấu Hình Combo vào Database")
             if save_btn:
                 if ma_lk and ten_lk:
@@ -263,7 +302,7 @@ with main_col:
                         }
                         supabase.table("Ton_kho").upsert(new_data).execute()
                         st.session_state.edit_combo_data = None
-                        st.success("Đã lưu thành công dữ liệu Combo vào Database!")
+                        st.success("Đã lưu thành công dữ liệu Combo và đồng bộ mã linh kiện tự động vào Database!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Lỗi khi lưu dữ liệu: {e}")
@@ -302,6 +341,10 @@ with main_col:
                 don_vi = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"], index=["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"].index(def_dv) if def_dv in ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"] else 0)
                 loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
                 hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
+            # CẢNH BÁO TRÙNG MÃ KHI NHẬP LẺ
+            if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
+                dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']} {dup_row['Don_vi']}). Bạn nên chọn mã này từ danh sách phía trên thay vì tạo mới để tránh trùng lặp.")
             ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới")
             save_btn = st.form_submit_button("💾 Lưu Linh kiện/Vật tư lẻ vào Database")
             if save_btn:
@@ -358,9 +401,9 @@ with main_col:
                     st.markdown("### 🔗 Các linh kiện con sẽ được cộng vào kho khi xé lẻ:")
                     for tp in cb_tp:
                         sub_m = tp.get('ma')
+                        sub_name = tp.get('ten', 'Linh kiện')
                         sub_dinh_muc = int(tp.get('sl', 1))
                         sub_match = df[df["Ma_LK"] == sub_m]
-                        sub_name = sub_match.iloc[0]["Ten_LK"] if not sub_match.empty else "Linh kiện lẻ mới"
                         sub_current_stock = int(sub_match.iloc[0]["So_luong"]) if not sub_match.empty else 0
                         st.write(f"- `{sub_m}` ({sub_name}) | Định mức/bộ: **{sub_dinh_muc}** | Tồn kho hiện tại: `{sub_current_stock}`")
                     with st.form("break_combo_form"):
@@ -383,13 +426,13 @@ with main_col:
                                 for tp in cb_tp:
                                     sub_m = tp.get('ma')
                                     sub_sl_tang = int(tp.get('sl', 1)) * int(so_luong_xe)
+                                    sub_name_con = tp.get('ten', 'Linh kiện')
                                     sub_row_df = df[df["Ma_LK"] == sub_m]
                                     if not sub_row_df.empty:
                                         sub_row = sub_row_df.iloc[0]
                                         sub_ton_cu = int(sub_row["So_luong"])
                                         sub_ton_moi = sub_ton_cu + sub_sl_tang
                                         sub_dv_con = sub_row.get("Don_vi", "Cái")
-                                        sub_ten_con = sub_row.get("Ten_LK", "Linh kiện")
                                         sub_img_con = sub_row.get("Hinh_anh", "")
                                         sub_tp_con = sub_row.get("Thanh_phan", [])
                                         sub_logs = sub_row.get("Nhat_ky", "")
@@ -398,7 +441,7 @@ with main_col:
                                             sub_log_moi = sub_logs + "\n" + sub_log_moi
                                         supabase.table("Ton_kho").upsert({
                                             "Ma_LK": sub_m,
-                                            "Ten_LK": sub_ten_con,
+                                            "Ten_LK": sub_name_con,
                                             "So_luong": sub_ton_moi,
                                             "Don_vi": sub_dv_con,
                                             "Nhat_ky": sub_log_moi,
@@ -409,7 +452,7 @@ with main_col:
                                         sub_log_moi = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - ➕ Nhận từ xé lẻ Combo '{selected_cb_ma}': +{sub_sl_tang} Cái"
                                         supabase.table("Ton_kho").upsert({
                                             "Ma_LK": sub_m,
-                                            "Ten_LK": f"Linh kiện thành phần ({sub_m})",
+                                            "Ten_LK": sub_name_con,
                                             "So_luong": sub_sl_tang,
                                             "Don_vi": "Cái",
                                             "Nhat_ky": sub_log_moi,
@@ -447,10 +490,10 @@ with main_col:
                     st.info("🔗 **Các linh kiện/vật tư con bên trong sẽ được trừ tự động theo định mức:**")
                     for tp in thanh_phan_list:
                         sub_m = tp.get('ma')
+                        sub_name = tp.get('ten', 'Linh kiện')
                         sub_sl = tp.get('sl')
                         sub_img = tp.get('img', '')
                         sub_item = df[df["Ma_LK"] == sub_m]
-                        sub_name = sub_item.iloc[0]["Ten_LK"] if not sub_item.empty else "Không rõ"
                         sub_stock = sub_item.iloc[0]["So_luong"] if not sub_item.empty else 0
                         st.write(f"- `{sub_m}` ({sub_name}) | Định mức trừ: **{sub_sl} x SL xuất** | Tồn kho hiện tại: `{sub_stock}`")
                         if sub_img:
@@ -523,6 +566,7 @@ with main_col:
                 if tp_list and isinstance(tp_list, list):
                     for tp in tp_list:
                         sub_m = tp.get("ma")
+                        sub_name = tp.get("ten", "Linh kiện")
                         if sub_m and not sub_m.startswith(("CB", "CM")) and sub_m not in all_items_dict:
                             sub_match = df[df["Ma_LK"] == sub_m]
                             if not sub_match.empty:
@@ -534,7 +578,7 @@ with main_col:
                                 }
                             else:
                                 all_items_dict[sub_m] = {
-                                    "Ten_LK": f"Linh kiện thành phần ({sub_m})",
+                                    "Ten_LK": sub_name,
                                     "So_luong": 0,
                                     "Don_vi": "Cái",
                                     "Hinh_anh": tp.get("img", "")
