@@ -129,7 +129,6 @@ with main_col:
     # 1. TỔNG QUAN TỒN KHO
     if menu_choice == "📊 Tổng quan tồn kho":
         st.title("📦 TỒN KHO HỆ THỐNG")
-        st.markdown("---")
         if not df.empty:
             df_filtered = df[df["So_luong"] >= 0].copy()
             for col_check in ["Gia_nhap", "Gia_xuat", "Barcode", "Quy_cach", "So_luong"]:
@@ -138,21 +137,19 @@ with main_col:
             df_filtered["Thanh_tien"] = pd.to_numeric(df_filtered["So_luong"], errors="coerce").fillna(0) * pd.to_numeric(df_filtered["Gia_nhap"], errors="coerce").fillna(0)
             tong_gia_tri_kho = df_filtered["Thanh_tien"].sum()
             tong_so_luong = int(df_filtered["So_luong"].sum())
+            # HIỂN THỊ TỔNG GIÁ TRỊ TỒN KHO BÊN NGOÀI BẢNG (NGAY DƯỚI TIÊU ĐỀ)
+            col_m1, col_m2, col_m3 = st.columns([2, 2, 3])
+            with col_m1:
+                st.metric(label="📊 TỔNG MẶT HÀNG IN KHO", value=f"{len(df_filtered)} sản phẩm")
+            with col_m2:
+                st.metric(label="📦 TỔNG SỐ LƯỢNG TỒN", value=f"{format_money(tong_so_luong)} đơn vị")
+            with col_m3:
+                st.metric(label="💰 TỔNG GIÁ TRỊ TỒN KHO", value=f"{format_money(tong_gia_tri_kho)} VNĐ")
+            st.markdown("---")
             df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
             df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
             df_display = df_filtered[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]].copy()
             df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
-            tong_row = {
-                "Mã sản phẩm": "📊 TỔNG CỘNG",
-                "Tên sản phẩm": "Tổng giá trị tồn kho:",
-                "Tồn kho": tong_so_luong,
-                "Đơn vị cơ bản": "",
-                "Quy cách (SL/Kiện)": "",
-                "Giá nhập (VNĐ)": f"{format_money(tong_gia_tri_kho)} VNĐ",
-                "Giá xuất (VNĐ)": "",
-                "Mã vạch (Barcode)": ""
-            }
-            df_display = pd.concat([df_display, pd.DataFrame([tong_row])], ignore_index=True)
             st.dataframe(df_display, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm linh kiện mới ở mục bên trái!")
@@ -409,27 +406,28 @@ with main_col:
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập mới lô combo đầu năm", key="new_cb_note")
         st.markdown("---")
         st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN & GIÁ CHI TIẾT")
+        # TÁCH PHẦN 2 RA KHỎI FORM ĐỂ TỰ SINH MÃ THỜI GIAN THỰC (REALTIME)
         tps_input = []
         for i in range(1, 11):
             st.markdown(f"**Thành phần {i}**")
-            # Sử dụng state callback để tự động cập nhật mã khi tên thay đổi trực tiếp
-            if f"tp_{i}_name_key" not in st.session_state:
-                st.session_state[f"tp_{i}_name_key"] = ""
-            if f"tp_{i}_code_key" not in st.session_state:
-                st.session_state[f"tp_{i}_code_key"] = ""
-            def make_update_code_callback(idx):
-                def update_code():
-                    tname = st.session_state.get(f"tp_{idx}_ten_input", "")
-                    auto_c = generate_code_from_name(tname, is_combo=False)
-                    st.session_state[f"tp_{idx}_ma_input"] = auto_c
-                return update_code
+            # Khởi tạo session_state cho từng ô nhập của thành phần i
+            tname_key = f"tp_{i}_name"
+            tma_key = f"tp_{i}_code"
+            if tname_key not in st.session_state:
+                st.session_state[tname_key] = ""
+            if tma_key not in st.session_state:
+                st.session_state[tma_key] = ""
+            # Hàm tự động cập nhật mã linh kiện ngay khi gõ tên
+            def on_tp_name_change(idx=i):
+                curr_name = st.session_state.get(f"tp_{idx}_name", "")
+                st.session_state[f"tp_{idx}_code"] = generate_code_from_name(curr_name, is_combo=False)
             sub_c1, sub_c2, sub_c_dv, sub_c_gia = st.columns([3, 1, 1, 1.5])
             with sub_c1:
                 t_name = st.text_input(
                     f"Tên linh kiện {i}", 
                     placeholder="VD: Bulong M24", 
-                    key=f"tp_{i}_ten_input",
-                    on_change=make_update_code_callback(i)
+                    key=tname_key,
+                    on_change=on_tp_name_change
                 )
             with sub_c2:
                 t_sl = st.number_input(f"Định mức {i}", min_value=1, value=1, key=f"new_tp_{i}_sl")
@@ -437,19 +435,11 @@ with main_col:
                 t_dv = st.selectbox(f"Đơn vị {i}", ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"], key=f"new_tp_{i}_dv")
             with sub_c_gia:
                 t_gia = st.number_input(f"Giá linh kiện {i} (VNĐ)", min_value=0, step=1000, value=0, format="%d", key=f"new_tp_{i}_gia")
-            # Xử lý hiển thị mã tự động
-            current_typed_name = st.session_state.get(f"tp_{i}_ten_input", "")
-            current_auto_code = generate_code_from_name(current_typed_name, is_combo=False)
-            if f"tp_{i}_ma_input" not in st.session_state:
-                st.session_state[f"tp_{i}_ma_input"] = current_auto_code
-            # Nếu người dùng đổi tên mà chưa đổi mã hoặc mã đang trống, tự động cập nhật mã theo tên
-            if current_typed_name and (not st.session_state[f"tp_{i}_ma_input"] or st.session_state[f"tp_{i}_ma_input"].startswith("VT-") or st.session_state[f"tp_{i}_ma_input"].startswith("LK-")):
-                st.session_state[f"tp_{i}_ma_input"] = current_auto_code
             sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
                 final_tp_code = st.text_input(
                     f"Mã linh kiện {i} (Tự sinh / Tự viết)", 
-                    key=f"tp_{i}_ma_input"
+                    key=tma_key
                 )
             with sub_c4:
                 t_img = st.text_input(f"Link ảnh {i}", key=f"new_tp_{i}_img")
