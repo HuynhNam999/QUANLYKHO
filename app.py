@@ -137,7 +137,6 @@ with main_col:
             df_filtered["Thanh_tien"] = pd.to_numeric(df_filtered["So_luong"], errors="coerce").fillna(0) * pd.to_numeric(df_filtered["Gia_nhap"], errors="coerce").fillna(0)
             tong_gia_tri_kho = df_filtered["Thanh_tien"].sum()
             tong_so_luong = int(df_filtered["So_luong"].sum())
-            # HIỂN THỊ TỔNG GIÁ TRỊ TỒN KHO BÊN NGOÀI BẢNG (NGAY DƯỚI TIÊU ĐỀ)
             col_m1, col_m2, col_m3 = st.columns([2, 2, 3])
             with col_m1:
                 st.metric(label="📊 TỔNG MẶT HÀNG IN KHO", value=f"{len(df_filtered)} sản phẩm")
@@ -406,28 +405,39 @@ with main_col:
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập mới lô combo đầu năm", key="new_cb_note")
         st.markdown("---")
         st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN & GIÁ CHI TIẾT")
-        # TÁCH PHẦN 2 RA KHỎI FORM ĐỂ TỰ SINH MÃ THỜI GIAN THỰC (REALTIME)
         tps_input = []
         for i in range(1, 11):
             st.markdown(f"**Thành phần {i}**")
-            # Khởi tạo session_state cho từng ô nhập của thành phần i
+            # Khởi tạo session_state cho từng thành phần
             tname_key = f"tp_{i}_name"
+            tmode_key = f"tp_{i}_mode"
+            ttype_key = f"tp_{i}_type"
             tma_key = f"tp_{i}_code"
             if tname_key not in st.session_state:
                 st.session_state[tname_key] = ""
+            if tmode_key not in st.session_state:
+                st.session_state[tmode_key] = "🤖 Tự sinh"
+            if ttype_key not in st.session_state:
+                st.session_state[ttype_key] = "🔩 Vật tư (VT)"
             if tma_key not in st.session_state:
                 st.session_state[tma_key] = ""
-            # Hàm tự động cập nhật mã linh kiện ngay khi gõ tên
-            def on_tp_name_change(idx=i):
-                curr_name = st.session_state.get(f"tp_{idx}_name", "")
-                st.session_state[f"tp_{idx}_code"] = generate_code_from_name(curr_name, is_combo=False)
+            # Hàm callback tự động cập nhật mã khi tên thay đổi
+            def make_name_change_cb(idx=i):
+                def callback():
+                    mode = st.session_state.get(f"tp_{idx}_mode", "🤖 Tự sinh")
+                    if mode.startswith("🤖"):
+                        curr_name = st.session_state.get(f"tp_{idx}_name", "")
+                        cat = st.session_state.get(f"tp_{idx}_type", "🔩 Vật tư (VT)")
+                        prefix = "LK" if "LK" in cat else "VT"
+                        st.session_state[f"tp_{idx}_code"] = generate_code_from_name(curr_name, is_combo=False, item_type=prefix)
+                return callback
             sub_c1, sub_c2, sub_c_dv, sub_c_gia = st.columns([3, 1, 1, 1.5])
             with sub_c1:
                 t_name = st.text_input(
                     f"Tên linh kiện {i}", 
                     placeholder="VD: Bulong M24", 
                     key=tname_key,
-                    on_change=on_tp_name_change
+                    on_change=make_name_change_cb(i)
                 )
             with sub_c2:
                 t_sl = st.number_input(f"Định mức {i}", min_value=1, value=1, key=f"new_tp_{i}_sl")
@@ -435,12 +445,32 @@ with main_col:
                 t_dv = st.selectbox(f"Đơn vị {i}", ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"], key=f"new_tp_{i}_dv")
             with sub_c_gia:
                 t_gia = st.number_input(f"Giá linh kiện {i} (VNĐ)", min_value=0, step=1000, value=0, format="%d", key=f"new_tp_{i}_gia")
+            # Bổ sung hàng lựa chọn Phân loại và Phương thức tạo mã tương tự Phần 1
+            col_tp_type, col_tp_mode = st.columns(2)
+            with col_tp_type:
+                item_cat_tp = st.radio(
+                    f"Phân loại thành phần {i}:",
+                    ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"],
+                    horizontal=True,
+                    key=ttype_key,
+                    on_change=make_name_change_cb(i)
+                )
+            with col_tp_mode:
+                item_mode_tp = st.radio(
+                    f"Phương thức mã thành phần {i}:",
+                    ["🤖 Tự sinh", "✍️ Tự viết"],
+                    horizontal=True,
+                    key=tmode_key,
+                    on_change=make_name_change_cb(i)
+                )
+            prefix_tp = "LK" if "LK" in item_cat_tp else "VT"
+            auto_code_tp = generate_code_from_name(t_name, is_combo=False, item_type=prefix_tp)
             sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
-                final_tp_code = st.text_input(
-                    f"Mã linh kiện {i} (Tự sinh / Tự viết)", 
-                    key=tma_key
-                )
+                if item_mode_tp.startswith("🤖"):
+                    final_tp_code = st.text_input(f"Mã linh kiện {i} (Tự động từ hệ thống)", value=auto_code_tp, key=f"tp_{i}_show_auto", disabled=True)
+                else:
+                    final_tp_code = st.text_input(f"Mã linh kiện {i} (Cá nhân tự viết)", key=tma_key)
             with sub_c4:
                 t_img = st.text_input(f"Link ảnh {i}", key=f"new_tp_{i}_img")
             st.markdown("---")
