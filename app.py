@@ -193,7 +193,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Đã tối ưu ô mã tự động nhảy ngay lập tức khi gõ tên)
+    # 3. NHẬP MỚI COMBO (Đã sửa lỗi hiển thị mã tự động live)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -280,6 +280,7 @@ with main_col:
             with sub_c3:
                 t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i")
             with sub_c4:
+                # Đã sửa gán value=auto_generated_code để hiện thị chính xác mã sinh ra
                 st.text_input(f"Mã tự động {i}", value=auto_generated_code, disabled=True, key=f"live_tp{i}_code")
             if auto_generated_code:
                 if auto_generated_code in generated_codes_in_form:
