@@ -33,7 +33,7 @@ def remove_vietnamese_accent(text):
     text = re.sub(r'[\u0300-\u036f]', '', text)
     text = text.replace('đ', 'd').replace('Đ', 'D')
     return text
-# Hàm tự động sinh mã rõ nghĩa, trực quan dựa theo tên sản phẩm
+# Hàm tự động sinh mã chuẩn gọn gàng, tối ưu cho kế toán & kho vận
 def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     if not full_name or not full_name.strip():
         return ""
@@ -43,16 +43,16 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
         clean_code = re.sub(r'[^A-Z0-9]', '_', upper_name)
         clean_code = re.sub(r'_+', '_', clean_code).strip('_')
         parts = clean_code.split('_')
-        if len(parts) > 3:
-            short_str = "_".join(parts[:3])
-        else:
-            short_str = clean_code
-        return f"CB-{short_str[:25]}"
+        short_str = "_".join(parts[:3]) if len(parts) > 3 else clean_code
+        return f"CB-{short_str[:20]}"
     prefix = item_type if item_type in ["LK", "VT"] else "VT"
+    # Viết tắt các từ khóa thông dụng để mã gọn gàng
+    upper_name = upper_name.replace("BULONG", "BL").replace("BU LONG", "BL")
+    upper_name = upper_name.replace("LONG DEN", "LD").replace("LON DEN", "LD")
     clean_code = re.sub(r'[^A-Z0-9]', '_', upper_name)
     clean_code = re.sub(r'_+', '_', clean_code).strip('_')
-    auto_code = f"{prefix}-{clean_code[:30]}"
-    return auto_code
+    auto_code = f"{prefix}-{clean_code[:22]}"
+    return auto_code.replace("__", "_").upper()
 # Quản lý đăng nhập
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -191,10 +191,9 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
-        # Bảng hướng dẫn nguyên tắc tạo mã Combo
-        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ COMBO:**\n"
-                  "- **Cấu trúc mã chuẩn:** `CB-[Tên_Sản_Phẩm]`\n"
-                  "- **Ví dụ:** Combo tên *'Bộ bàn gỗ lim'* ➡️ Hệ thống tự sinh mã: `CB-BO_BAN_GO_LIM`\n"
+        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ COMBO (CHUẨN GỌN GÀNG):**\n"
+                  "- **Cấu trúc mã chuẩn:** `CB-[Tên_Viết_Tắt]`\n"
+                  "- **Ví dụ:** Combo tên *'Bộ bàn gỗ lim'* ➡️ Hệ thống tự sinh mã gọn: `CB-BO_BAN_GO_LIM`\n"
                   "- ⚠️ **Lưu ý:** Nếu mã trùng với hệ thống, màn hình sẽ hiển thị **cảnh báo đỏ** để bạn kiểm tra lại.")
         che_do_nhap = st.radio(
             "⚙️ Chọn phương thức khai báo Combo:",
@@ -244,7 +243,7 @@ with main_col:
                 key="cb_ma_mode_radio"
             )
             if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo (Tự động sinh)", value=auto_cb_code, key="cb_code_auto_val")
+                ma_lk = st.text_input("Mã Combo (Tự động sinh gọn gàng)", value=auto_cb_code, key="cb_code_auto_val")
             else:
                 ma_lk = st.text_input("Mã Combo (Cá nhân tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val")
             so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
@@ -371,12 +370,10 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
-        # Bảng hướng dẫn nguyên tắc tạo mã Linh kiện / Vật tư lẻ
-        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ LINH KIỆN / VẬT TƯ:**\n"
-                  "- **Cấu trúc mã chuẩn:** `VT-[Tên_Sản_Phẩm]` (vật tư) hoặc `LK-[Tên_Sản_Phẩm]` (linh kiện)\n"
-                  "- **Ví dụ:** Vật tư tên *'Bulong mạ dacromet M24x85'* ➡️ Tự sinh mã: `VT-BULONG_MA_DACROMET_M24X85`\n"
+        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ LINH KIỆN / VẬT TƯ (CHUẨN GỌN GÀNG):**\n"
+                  "- **Cấu trúc mã chuẩn:** `VT-[Tên_Viết_Tắt]` hoặc `LK-[Tên_Viết_Tắt]`\n"
+                  "- **Ví dụ:** Vật tư tên *'Bulong mạ dacromet M24x85'* ➡️ Tự sinh mã gọn: `VT-BL_MA_DACROMET_M24X85`\n"
                   "- ⚠️ **Lưu ý:** Nếu mã trùng với dữ liệu cũ trong kho, màn hình sẽ hiển thị **cảnh báo đỏ** ngay lập tức.")
-        # Lọc danh sách: Chỉ lấy sản phẩm LẺ (bắt đầu bằng LK hoặc VT), loại bỏ hoàn toàn Combo (CB)
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
@@ -445,7 +442,7 @@ with main_col:
             prefix_type_le = "LK" if "LK" in item_cat_le else "VT"
             auto_code_le = generate_code_from_name(st.session_state.le_ten_input_val, is_combo=False, item_type=prefix_type_le)
             if item_method_le.startswith("🤖"):
-                ma_lk = st.text_input("Mã LK / VT (Tự động sinh)", value=auto_code_le, key="le_code_auto_show")
+                ma_lk = st.text_input("Mã LK / VT (Tự động sinh gọn gàng)", value=auto_code_le, key="le_code_auto_show")
             else:
                 manual_default = st.session_state.le_ma_input_val if st.session_state.le_ma_input_val else auto_code_le
                 ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=manual_default, key="le_code_manual_show")
