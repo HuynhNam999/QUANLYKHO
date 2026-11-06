@@ -5,16 +5,17 @@ from supabase import create_client, Client
 import json
 import io
 import re
-# Cấu hình giao diện chiếm toàn màn hình
+import unicodedata
+# Cấu hình giao diện toàn màn hình
 st.set_page_config(page_title="Quản Lý Kho Cá Nhân", page_icon="📦", layout="wide")
-# Khởi tạo kết nối Supabase an toàn tuyệt đối từ Secrets
+# Khởi tạo kết nối Supabase
 @st.cache_resource
 def init_supabase():
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 supabase: Client = init_supabase()
-# Tải dữ liệu từ bảng Ton_kho
+# Tải dữ liệu tồn kho
 @st.cache_data(ttl=0)
 def load_data():
     try:
@@ -24,33 +25,53 @@ def load_data():
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
 df = load_data()
-# Hàm thông minh tự động sinh mã chuẩn CB, LK, VT
-def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
-    if not full_name:
+# Hàm loại bỏ dấu tiếng Việt
+def remove_vietnamese_accent(text):
+    if not text:
         return ""
-    name_clean = full_name.strip()
-    upper_name = name_clean.upper()
+    text = unicodedata.normalize('NFD', text)
+    text = re.sub(r'[\u0300-\u036f]', '', text)
+    text = text.replace('đ', 'd').replace('Đ', 'D')
+    return text
+# Hàm tự động sinh mã thông minh
+def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
+    if not full_name or not full_name.strip():
+        return ""
+    clean_no_accent = remove_vietnamese_accent(full_name.strip())
+    upper_name = clean_no_accent.upper()
     if is_combo:
-        name_code = "".join([c for c in upper_name if c.isalnum()])[:6]
-        return f"CB-{name_code}" if name_code else "CB-01"
+        # Lấy các ký tự chữ và số
+        words = upper_name.split()
+        if len(words) >= 2:
+            code_part = "".join([w[0] for w in words if w.isalnum()])[:8]
+            if len(code_part) < 3:
+                code_part = "".join([c for c in upper_name if c.isalnum()])[:8]
+        else:
+            code_part = "".join([c for c in upper_name if c.isalnum()])[:8]
+        return f"CB-{code_part}" if code_part else "CB-01"
     prefix = item_type if item_type in ["LK", "VT"] else "VT"
     size_match = re.search(r'M\d+(?:[xX]\d+)?', upper_name)
-    size_str = size_match.group(0).replace('X', 'x') if size_match else "GENERAL"
+    size_str = size_match.group(0).replace('X', 'x') if size_match else ""
     grade_match = re.search(r'\b\d+\.\d+\b', upper_name)
     grade_str = f"_{grade_match.group(0)}" if grade_match else ""
     surface_code = ""
-    if "NHÚNG NÓNG" in upper_name:
+    if "NHUNG NONG" in upper_name:
         surface_code = "_NN"
     elif "DACROMET" in upper_name:
         surface_code = "_DC"
-    elif "MẠ" in upper_name:
+    elif "MA" in upper_name:
         surface_code = "_MA"
-    elif "NGẠNH" in upper_name:
+    elif "NGANH" in upper_name:
         surface_code = "_NGANH"
-    auto_code = f"{prefix}-{size_str}{grade_str}{surface_code}"
+    if size_str:
+        auto_code = f"{prefix}-{size_str}{grade_str}{surface_code}"
+    else:
+        words = upper_name.split()
+        short_name = "".join([w[0] for w in words if w.isalnum()])[:6]
+        auto_code = f"{prefix}-{short_name}"
     auto_code = re.sub(r'[\s_]+', '_', auto_code).strip('_').upper()
     return auto_code
-# Quản lý đăng nhập hệ thống
+# Quản lý đăng nhập
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
@@ -150,11 +171,12 @@ with main_col:
                             sub_m = tp.get('ma')
                             sub_name = tp.get('ten', '')
                             sub_sl = tp.get('sl')
+                            sub_dv = tp.get('dv', 'Cái')
                             sub_img = tp.get('img', '')
                             sub_match = df[df["Ma_LK"] == sub_m]
                             if not sub_name and not sub_match.empty:
                                 sub_name = sub_match.iloc[0]["Ten_LK"]
-                            st.write(f"- `{sub_m}` ({sub_name}) | Định mức: **{sub_sl}**")
+                            st.write(f"- `{sub_m}` ({sub_name}) | Định mức: **{sub_sl} {sub_dv}**")
                             if sub_img:
                                 st.image(sub_img, width=80)
                 with col_info2:
@@ -226,7 +248,7 @@ with main_col:
         st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
         c1, c2 = st.columns(2)
         with c1:
-            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn ăn 4 ghế")
+            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn gỗ lim")
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
             cb_ma_mode = st.radio(
                 "Phương thức mã Combo:",
@@ -235,9 +257,9 @@ with main_col:
                 key="cb_ma_mode_radio"
             )
             if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo (Bắt đầu bằng CB)", value=auto_cb_code, key="cb_code_display_auto")
+                ma_lk = st.text_input("Mã Combo (Bắt đầu bằng CB)", value=auto_cb_code, key="cb_code_auto_val")
             else:
-                ma_lk = st.text_input("Mã Combo (Tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_display_manual")
+                ma_lk = st.text_input("Mã Combo (Tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val")
             so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
         with c2:
             don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input")
@@ -258,13 +280,13 @@ with main_col:
         generated_codes_in_form = []
         for i in range(1, 11):
             st.markdown(f"**Thành phần {i}**")
-            sub_c1, sub_c2 = st.columns([3, 1])
+            sub_c1, sub_c2, sub_c_dv = st.columns([3, 1, 1])
             with sub_c1:
                 t_name = st.text_input(
                     f"Tên đầy đủ linh kiện/vật tư {i}", 
                     value=str(get_tp_val(i-1, 'ten')), 
                     key=f"live_tp{i}_ten", 
-                    placeholder="VD: Bulong 8.8 mạ nhúng nóng M12x40"
+                    placeholder="VD: Bulong 8.8 mạ nhúng nóng M16x50"
                 )
             with sub_c2:
                 t_sl = st.number_input(
@@ -272,6 +294,16 @@ with main_col:
                     min_value=1, 
                     value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, 
                     key=f"live_tp{i}_s"
+                )
+            with sub_c_dv:
+                old_dv_val = get_tp_val(i-1, 'dv')
+                dv_list = ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"]
+                dv_idx = dv_list.index(old_dv_val) if old_dv_val in dv_list else 0
+                t_dv = st.selectbox(
+                    f"Đơn vị tính {i}",
+                    dv_list,
+                    index=dv_idx,
+                    key=f"live_tp{i}_dv"
                 )
             sub_type_col1, sub_type_col2 = st.columns(2)
             with sub_type_col1:
@@ -294,9 +326,9 @@ with main_col:
             sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
                 if tp_ma_choice.startswith("🤖"):
-                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i}", value=auto_generated_code, key=f"live_tp{i}_code_auto")
+                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i}", value=auto_generated_code, key=f"live_tp{i}_code_auto_val")
                 else:
-                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Tự viết)", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual")
+                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Tự viết)", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual_val")
             with sub_c4:
                 t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i")
             if final_tp_code:
@@ -311,6 +343,7 @@ with main_col:
                 "ten": t_name,
                 "ma": final_tp_code,
                 "sl": int(t_sl),
+                "dv": t_dv,
                 "img": t_img.strip() if t_img else ""
             })
         danh_sach_thanh_phan = [item for item in tps_input if item["ten"] and item["ten"].strip() != ""]
@@ -442,9 +475,10 @@ with main_col:
                         sub_m = tp.get('ma')
                         sub_name = tp.get('ten', 'Linh kiện')
                         sub_dinh_muc = int(tp.get('sl', 1))
+                        sub_dv_con = tp.get('dv', 'Cái')
                         sub_match = df[df["Ma_LK"] == sub_m]
                         sub_current_stock = int(sub_match.iloc[0]["So_luong"]) if not sub_match.empty else 0
-                        st.write(f"- `{sub_m}` ({sub_name}) | Định mức/bộ: **{sub_dinh_muc}** | Tồn kho hiện tại: `{sub_current_stock}`")
+                        st.write(f"- `{sub_m}` ({sub_name}) | Định mức/bộ: **{sub_dinh_muc} {sub_dv_con}** | Tồn kho hiện tại: `{sub_current_stock}`")
                     with st.form("break_combo_form"):
                         so_luong_xe = st.number_input("Số lượng bộ Combo muốn xé lẻ", min_value=1, max_value=max(1, cb_ton), step=1, value=1)
                         noi_dung_xe = st.text_input("Ghi chú / Mục đích xé lẻ", placeholder="Ví dụ: Xé lẻ 1 bộ để lấy linh kiện bán lẻ")
@@ -466,12 +500,12 @@ with main_col:
                                     sub_m = tp.get('ma')
                                     sub_sl_tang = int(tp.get('sl', 1)) * int(so_luong_xe)
                                     sub_name_con = tp.get('ten', 'Linh kiện')
+                                    sub_dv_con = tp.get('dv', 'Cái')
                                     sub_row_df = df[df["Ma_LK"] == sub_m]
                                     if not sub_row_df.empty:
                                         sub_row = sub_row_df.iloc[0]
                                         sub_ton_cu = int(sub_row["So_luong"])
                                         sub_ton_moi = sub_ton_cu + sub_sl_tang
-                                        sub_dv_con = sub_row.get("Don_vi", "Cái")
                                         sub_img_con = sub_row.get("Hinh_anh", "")
                                         sub_tp_con = sub_row.get("Thanh_phan", [])
                                         sub_logs = sub_row.get("Nhat_ky", "")
@@ -488,12 +522,12 @@ with main_col:
                                             "Thanh_phan": sub_tp_con
                                         }).execute()
                                     else:
-                                        sub_log_moi = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - ➕ Nhận từ xé lẻ Combo '{selected_cb_ma}': +{sub_sl_tang} Cái"
+                                        sub_log_moi = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - ➕ Nhận từ xé lẻ Combo '{selected_cb_ma}': +{sub_sl_tang} {sub_dv_con}"
                                         supabase.table("Ton_kho").upsert({
                                             "Ma_LK": sub_m,
                                             "Ten_LK": sub_name_con,
                                             "So_luong": sub_sl_tang,
-                                            "Don_vi": "Cái",
+                                            "Don_vi": sub_dv_con,
                                             "Nhat_ky": sub_log_moi,
                                             "Hinh_anh": tp.get("img", ""),
                                             "Thanh_phan": []
@@ -531,10 +565,11 @@ with main_col:
                         sub_m = tp.get('ma')
                         sub_name = tp.get('ten', 'Linh kiện')
                         sub_sl = tp.get('sl')
+                        sub_dv = tp.get('dv', 'Cái')
                         sub_img = tp.get('img', '')
                         sub_item = df[df["Ma_LK"] == sub_m]
                         sub_stock = sub_item.iloc[0]["So_luong"] if not sub_item.empty else 0
-                        st.write(f"- `{sub_m}` ({sub_name}) | Định mức trừ: **{sub_sl} x SL xuất** | Tồn kho hiện tại: `{sub_stock}`")
+                        st.write(f"- `{sub_m}` ({sub_name}) | Định mức trừ: **{sub_sl} {sub_dv} x SL xuất** | Tồn kho hiện tại: `{sub_stock}`")
                         if sub_img:
                             st.image(sub_img, width=60)
                 with st.form("export_combo_form", clear_on_submit=True):
@@ -606,6 +641,7 @@ with main_col:
                     for tp in tp_list:
                         sub_m = tp.get("ma")
                         sub_name = tp.get("ten", "Linh kiện")
+                        sub_dv = tp.get("dv", "Cái")
                         if sub_m and not sub_m.startswith(("CB", "CM")) and sub_m not in all_items_dict:
                             sub_match = df[df["Ma_LK"] == sub_m]
                             if not sub_match.empty:
@@ -619,7 +655,7 @@ with main_col:
                                 all_items_dict[sub_m] = {
                                     "Ten_LK": sub_name,
                                     "So_luong": 0,
-                                    "Don_vi": "Cái",
+                                    "Don_vi": sub_dv,
                                     "Hinh_anh": tp.get("img", "")
                                 }
             export_options = [f"{m} - {info['Ten_LK']}" for m, info in all_items_dict.items()]
