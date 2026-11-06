@@ -257,6 +257,34 @@ with main_col:
                 st.write("")
                 if st.button("📥 Nạp dữ liệu cũ lên Form", type="secondary"):
                     st.session_state.selected_cb_to_edit = chosen_combo_str.split(" - ")[0]
+                    # Load dữ liệu chi tiết của combo vào session_state để form hiển thị đúng
+                    matched_load = df[df["Ma_LK"] == st.session_state.selected_cb_to_edit]
+                    if not matched_load.empty:
+                        row_l = matched_load.iloc[0]
+                        st.session_state.edit_cb_ten = row_l.get("Ten_LK", "")
+                        st.session_state.edit_cb_dv = row_l.get("Don_vi", "Bộ")
+                        st.session_state.edit_cb_qc = int(row_l.get("Quy_cach", 1))
+                        st.session_state.edit_cb_bc = row_l.get("Barcode", "")
+                        st.session_state.edit_cb_gn = int(row_l.get("Gia_nhap", 0)) if row_l.get("Gia_nhap") else 0
+                        st.session_state.edit_cb_gx = int(row_l.get("Gia_xuat", 0)) if row_l.get("Gia_xuat") else 0
+                        st.session_state.edit_cb_img = row_l.get("Hinh_anh", "")
+                        tp_old_list = row_l.get("Thanh_phan", [])
+                        for idx_l in range(1, 11):
+                            if isinstance(tp_old_list, list) and (idx_l - 1) < len(tp_old_list):
+                                item_t = tp_old_list[idx_l - 1]
+                                st.session_state[f"ef_tp_{idx_l}_ten"] = item_t.get("ten", "")
+                                st.session_state[f"ef_tp_{idx_l}_sl"] = int(item_t.get("sl", 1))
+                                st.session_state[f"ef_tp_{idx_l}_dv"] = item_t.get("dv", "Cái")
+                                st.session_state[f"ef_tp_{idx_l}_gia"] = int(item_t.get("gia", 0)) if item_t.get("gia") else 0
+                                st.session_state[f"ef_tp_{idx_l}_ma"] = item_t.get("ma", "")
+                                st.session_state[f"ef_tp_{idx_l}_img"] = item_t.get("img", "")
+                            else:
+                                st.session_state[f"ef_tp_{idx_l}_ten"] = ""
+                                st.session_state[f"ef_tp_{idx_l}_sl"] = 1
+                                st.session_state[f"ef_tp_{idx_l}_dv"] = "Cái"
+                                st.session_state[f"ef_tp_{idx_l}_gia"] = 0
+                                st.session_state[f"ef_tp_{idx_l}_ma"] = ""
+                                st.session_state[f"ef_tp_{idx_l}_img"] = ""
                     st.success(f"Đã nạp dữ liệu của `{st.session_state.selected_cb_to_edit}` lên form!")
                     st.rerun()
         else:
@@ -268,61 +296,72 @@ with main_col:
             if not matched_rows.empty:
                 active_data = matched_rows.iloc[0].to_dict()
         def_ma = active_data.get("Ma_LK", "")
-        def_ten = active_data.get("Ten_LK", "")
-        def_dv = active_data.get("Don_vi", "Bộ")
-        def_img = active_data.get("Hinh_anh", "")
+        def_ten = st.session_state.get("edit_cb_ten", active_data.get("Ten_LK", ""))
+        def_dv = st.session_state.get("edit_cb_dv", active_data.get("Don_vi", "Bộ"))
+        def_img = st.session_state.get("edit_cb_img", active_data.get("Hinh_anh", ""))
         def_tp = active_data.get("Thanh_phan", [])
-        def_gianhap = int(active_data.get("Gia_nhap", 0)) if active_data.get("Gia_nhap") else 0
-        def_giaxuat = int(active_data.get("Gia_xuat", 0)) if active_data.get("Gia_xuat") else 0
-        def_barcode = active_data.get("Barcode", "") if active_data.get("Barcode") else ""
-        def_quycach = int(active_data.get("Quy_cach", 1)) if active_data.get("Quy_cach") else 1
+        def_gianhap = st.session_state.get("edit_cb_gn", int(active_data.get("Gia_nhap", 0)) if active_data.get("Gia_nhap") else 0)
+        def_giaxuat = st.session_state.get("edit_cb_gx", int(active_data.get("Gia_xuat", 0)) if active_data.get("Gia_xuat") else 0)
+        def_barcode = st.session_state.get("edit_cb_bc", active_data.get("Barcode", "") if active_data.get("Barcode") else "")
+        def_quycach = st.session_state.get("edit_cb_qc", int(active_data.get("Quy_cach", 1)) if active_data.get("Quy_cach") else 1)
         if target_cb_code:
             st.info(f"Đang thao tác chỉnh sửa cho Combo: **{target_cb_code}**")
         with st.form("edit_combo_form_final"):
             c1, c2 = st.columns(2)
             with c1:
-                ten_lk_e = st.text_input("Tên Combo", value=def_ten)
+                ten_lk_e = st.text_input("Tên Combo", value=def_ten, key="edit_cb_ten")
                 ma_lk_e = st.text_input("Mã Combo (Cố định)", value=def_ma, disabled=True)
-                quy_cach_e = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach)
-                barcode_e = st.text_input("Mã vạch (Barcode)", value=def_barcode)
+                quy_cach_e = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach, key="edit_cb_qc")
+                barcode_e = st.text_input("Mã vạch (Barcode)", value=def_barcode, key="edit_cb_bc")
             with c2:
                 dv_list = ["Bộ", "Hộp", "Combo"]
                 dv_idx = dv_list.index(def_dv) if def_dv in dv_list else 0
-                don_vi_e = st.selectbox("Đơn vị tính cơ bản", dv_list, index=dv_idx)
-                gia_nhap_e = st.number_input("Giá nhập Combo (VNĐ)", min_value=0, step=1000, value=def_gianhap, format="%d")
-                gia_xuat_e = st.number_input("Giá xuất Combo (VNĐ)", min_value=0, step=1000, value=def_giaxuat, format="%d")
-                hinh_anh_e = st.text_input("Link ảnh chi tiết (URL)", value=def_img)
+                don_vi_e = st.selectbox("Đơn vị tính cơ bản", dv_list, index=dv_idx, key="edit_cb_dv")
+                gia_nhap_e = st.number_input("Giá nhập Combo (VNĐ)", min_value=0, step=1000, value=def_gianhap, format="%d", key="edit_cb_gn")
+                gia_xuat_e = st.number_input("Giá xuất Combo (VNĐ)", min_value=0, step=1000, value=def_giaxuat, format="%d", key="edit_cb_gx")
+                hinh_anh_e = st.text_input("Link ảnh chi tiết (URL)", value=def_img, key="edit_cb_img")
             ghi_chu_e = st.text_input("Ghi chú điều chỉnh", placeholder="Ví dụ: Cập nhật tăng giá bán và giá nhập mới")
             st.markdown("---")
             st.markdown("### 🧩 THÀNH PHẦN COMBO HIỆN TẠI & GIÁ CHI TIẾT")
             def get_tp_val_e(idx, field):
-                if idx < len(def_tp) and isinstance(def_tp, list):
-                    val = def_tp[idx].get(field, "")
-                    return val if val is not None else ""
-                return ""
+                # Ưu tiên lấy từ session_state nếu đã nạp, nếu không lấy từ dữ liệu gốc
+                session_key = f"ef_tp_{idx}_"
+                if field == 'ten': session_key += 'ten'
+                elif field == 'sl': session_key += 'sl'
+                elif field == 'dv': session_key += 'dv'
+                elif field == 'gia': session_key += 'gia'
+                elif field == 'ma': session_key += 'ma'
+                elif field == 'img': session_key += 'img'
+                if session_key in st.session_state:
+                    return st.session_state[session_key]
+                if (idx - 1) < len(def_tp) and isinstance(def_tp, list):
+                    val = def_tp[idx - 1].get(field, "")
+                    return val if val is not None else ("" if field in ['ten', 'ma', 'img'] else (1 if field == 'sl' else 0))
+                return "" if field in ['ten', 'ma', 'img'] else (1 if field == 'sl' else 0)
             tps_input_e = []
             for i in range(1, 11):
                 st.markdown(f"**Thành phần {i}**")
                 sub_c1, sub_c2, sub_c_dv, sub_c_gia = st.columns([3, 1, 1, 1.5])
                 with sub_c1:
-                    t_name_e = st.text_input(f"Tên linh kiện {i}", value=str(get_tp_val_e(i-1, 'ten')), key=f"ef_tp_{i}_ten")
+                    t_name_e = st.text_input(f"Tên linh kiện {i}", value=str(get_tp_val_e(i, 'ten')), key=f"ef_tp_{i}_ten")
                 with sub_c2:
-                    t_sl_e = st.number_input(f"Định mức {i}", min_value=1, value=int(get_tp_val_e(i-1, 'sl')) if str(get_tp_val_e(i-1, 'sl')).isdigit() else 1, key=f"ef_tp_{i}_sl")
+                    val_sl = get_tp_val_e(i, 'sl')
+                    t_sl_e = st.number_input(f"Định mức {i}", min_value=1, value=int(val_sl) if str(val_sl).isdigit() else 1, key=f"ef_tp_{i}_sl")
                 with sub_c_dv:
-                    old_dv_e = get_tp_val_e(i-1, 'dv')
+                    old_dv_e = get_tp_val_e(i, 'dv')
                     dv_sub_list = ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"]
                     dv_s_idx_e = dv_sub_list.index(old_dv_e) if old_dv_e in dv_sub_list else 0
                     t_dv_e = st.selectbox(f"Đơn vị {i}", dv_sub_list, index=dv_s_idx_e, key=f"ef_tp_{i}_dv")
                 with sub_c_gia:
-                    old_gia_e = get_tp_val_e(i-1, 'gia')
+                    old_gia_e = get_tp_val_e(i, 'gia')
                     val_gia = int(old_gia_e) if old_gia_e and str(old_gia_e).replace('.','',1).isdigit() else 0
                     t_gia_e = st.number_input(f"Giá linh kiện {i} (VNĐ)", min_value=0, step=1000, value=val_gia, format="%d", key=f"ef_tp_{i}_gia")
-                old_code_e = get_tp_val_e(i-1, 'ma')
+                old_code_e = get_tp_val_e(i, 'ma')
                 sub_c3, sub_c4 = st.columns([3, 1])
                 with sub_c3:
-                    final_tp_code_e = st.text_input(f"Mã linh kiện {i}", value=old_code_e if old_code_e else generate_code_from_name(t_name_e, is_combo=False), key=f"ef_tp_{i}_ma")
+                    final_tp_code_e = st.text_input(f"Mã linh kiện {i}", value=str(old_code_e) if old_code_e else generate_code_from_name(t_name_e, is_combo=False), key=f"ef_tp_{i}_ma")
                 with sub_c4:
-                    t_img_e = st.text_input(f"Link ảnh {i}", value=str(get_tp_val_e(i-1, 'img')), key=f"ef_tp_{i}_img")
+                    t_img_e = st.text_input(f"Link ảnh {i}", value=str(get_tp_val_e(i, 'img')), key=f"ef_tp_{i}_img")
                 st.markdown("---")
                 tps_input_e.append({
                     "ten": t_name_e,
@@ -408,7 +447,6 @@ with main_col:
         tps_input = []
         for i in range(1, 11):
             st.markdown(f"**Thành phần {i}**")
-            # Khởi tạo session_state cho từng thành phần
             tname_key = f"tp_{i}_name"
             tmode_key = f"tp_{i}_mode"
             ttype_key = f"tp_{i}_type"
@@ -421,7 +459,6 @@ with main_col:
                 st.session_state[ttype_key] = "🔩 Vật tư (VT)"
             if tma_key not in st.session_state:
                 st.session_state[tma_key] = ""
-            # Hàm callback tự động cập nhật mã khi tên thay đổi
             def make_name_change_cb(idx=i):
                 def callback():
                     mode = st.session_state.get(f"tp_{idx}_mode", "🤖 Tự sinh")
@@ -445,7 +482,6 @@ with main_col:
                 t_dv = st.selectbox(f"Đơn vị {i}", ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"], key=f"new_tp_{i}_dv")
             with sub_c_gia:
                 t_gia = st.number_input(f"Giá linh kiện {i} (VNĐ)", min_value=0, step=1000, value=0, format="%d", key=f"new_tp_{i}_gia")
-            # Bổ sung hàng lựa chọn Phân loại và Phương thức tạo mã tương tự Phần 1
             col_tp_type, col_tp_mode = st.columns(2)
             with col_tp_type:
                 item_cat_tp = st.radio(
