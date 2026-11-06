@@ -24,8 +24,8 @@ def load_data():
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
 df = load_data()
-# Hàm thông minh tự động sinh mã cơ khí/vật tư từ tên sản phẩm
-def generate_code_from_name(full_name, is_combo=False):
+# Hàm thông minh tự động sinh mã chuẩn CB, LK, VT
+def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     if not full_name:
         return ""
     name_clean = full_name.strip()
@@ -33,15 +33,8 @@ def generate_code_from_name(full_name, is_combo=False):
     if is_combo:
         name_code = "".join([c for c in upper_name if c.isalnum()])[:6]
         return f"CB-{name_code}" if name_code else "CB-01"
-    prefix = "VT"
-    if "TÁN" in upper_name or "Ê-CU" in upper_name or "ECU" in upper_name:
-        prefix = "TAN"
-    elif "BULONG" in upper_name or "BU LÔNG" in upper_name:
-        prefix = "BL"
-    elif "VÍT" in upper_name:
-        prefix = "VIT"
-    elif "LONG ĐỀN" in upper_name or "VÒNG ĐỆM" in upper_name:
-        prefix = "LD"
+    # Lấy tiền tố do người dùng chọn: "LK" hoặc "VT" (hoặc tự nhận diện nếu muốn)
+    prefix = item_type if item_type in ["LK", "VT"] else "VT"
     size_match = re.search(r'M\d+(?:[xX]\d+)?', upper_name)
     size_str = size_match.group(0).replace('X', 'x') if size_match else "GENERAL"
     grade_match = re.search(r'\b\d+\.\d+\b', upper_name)
@@ -235,23 +228,17 @@ with main_col:
         c1, c2 = st.columns(2)
         with c1:
             ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn gỗ lim")
-            # Sinh mã tự động dựa theo tên
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
-            # Nút chọn chế độ mã ngay trên đầu ô mã duy nhất
             cb_ma_mode = st.radio(
                 "Phương thức mã Combo:",
                 ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
                 horizontal=True,
                 key="cb_ma_mode_radio"
             )
-            # Khởi tạo session state cho mã thủ công nếu chưa có
-            if "cb_manual_val" not in st.session_state:
-                st.session_state.cb_manual_val = def_ma if def_ma else auto_cb_code
-            # Nếu chọn tự động thì hiển thị mã tự động, nếu chọn thủ công thì mở ô cho tự viết
             if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo", value=auto_cb_code, disabled=True, key="cb_code_display_auto")
+                ma_lk = st.text_input("Mã Combo (Bắt đầu bằng CB)", value=auto_cb_code, disabled=True, key="cb_code_display_auto")
             else:
-                ma_lk = st.text_input("Mã Combo (Tự viết)", value=st.session_state.cb_manual_val, key="cb_code_display_manual")
+                ma_lk = st.text_input("Mã Combo (Tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_display_manual")
             so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
         with c2:
             don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input")
@@ -287,15 +274,25 @@ with main_col:
                     value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, 
                     key=f"live_tp{i}_s"
                 )
-            auto_generated_code = generate_code_from_name(t_name, is_combo=False)
+            # Thêm nút chọn loại: Linh kiện (LK) hay Vật tư (VT)
+            sub_type_col1, sub_type_col2 = st.columns(2)
+            with sub_type_col1:
+                item_cat = st.radio(
+                    f"Phân loại thành phần {i}:",
+                    ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"],
+                    horizontal=True,
+                    key=f"tp{i}_cat_radio"
+                )
+            with sub_type_col2:
+                tp_ma_choice = st.radio(
+                    f"Phương thức mã cho Thành phần {i}:",
+                    ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
+                    horizontal=True,
+                    key=f"tp{i}_method_radio"
+                )
+            prefix_type = "LK" if "LK" in item_cat else "VT"
+            auto_generated_code = generate_code_from_name(t_name, is_combo=False, item_type=prefix_type)
             old_saved_code = get_tp_val(i-1, 'ma')
-            # Nút chọn phương thức mã cho từng thành phần con
-            tp_ma_choice = st.radio(
-                f"Phương thức mã cho Thành phần {i}:",
-                ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
-                horizontal=True,
-                key=f"tp{i}_method_radio"
-            )
             sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
                 if tp_ma_choice.startswith("🤖"):
