@@ -25,15 +25,6 @@ def load_data():
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
 df = load_data()
-# Hàm định dạng tiền tệ theo chuẩn kế toán Việt Nam (Dùng dấu chấm phân cách hàng nghìn, không hiện số 0 thừa)
-def format_money(val):
-    try:
-        if pd.isna(val) or val == "":
-            return "0"
-        num = float(val)
-        return f"{num:,.0f}".replace(",", ".")
-    except Exception:
-        return "0"
 # Hàm loại bỏ dấu tiếng Việt
 def remove_vietnamese_accent(text):
     if not text:
@@ -86,7 +77,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-# --- MENU ĐIỀU HƯỚNG BÊN TRÁI ---
+# --- MENU ĐIỀU HƯỚNG BÊN TRÁI (Đã sắp xếp lại vị trí Điều chỉnh giá lên trên Nhập mới) ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
@@ -113,26 +104,25 @@ if st.sidebar.button("🚪 Đăng xuất"):
 # --- GIAO DIỆN CHÍNH BÊN PHẢI ---
 _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
-    # 1. TỔNG QUAN TỒN KHO (Căn giữa hoàn toàn các cột số liệu & đơn vị)
+    # 1. TỔNG QUAN TỒN KHO
     if menu_choice == "📊 Tổng quan tồn kho":
         st.title("📦 TỒN KHO HỆ THỐNG")
         st.markdown("---")
         if not df.empty:
             df_filtered = df[df["So_luong"] >= 0].copy()
+            def highlight_negative(val):
+                color = 'red' if isinstance(val, (int, float)) and val < 0 else 'black'
+                return f'color: {color}; text-align: center;'
             for col_check in ["Gia_nhap", "Gia_xuat", "Barcode", "Quy_cach"]:
                 if col_check not in df_filtered.columns:
                     df_filtered[col_check] = 1 if col_check == "Quy_cach" else (0 if "Gia" in col_check else "")
-            df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
-            df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
-            df_display = df_filtered[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]]
+            df_display = df_filtered[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap", "Gia_xuat", "Barcode"]]
             df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
-            # Sử dụng Pandas Styler để căn giữa toàn bộ các cột từ cột thứ 3 trở đi (hoặc chọn cụ thể tên cột)
-            center_cols = ["Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)", "Mã sản phẩm"]
-            styled_df = df_display.style.set_properties(
-                subset=center_cols, **{'text-align': 'center'}
-            ).set_table_styles([
-                dict(selector='th', props=[('text-align', 'center')])
-            ])
+            styled_df = df_display.style.map(
+                lambda x: 'text-align: center;', subset=['Mã sản phẩm', 'Tồn kho', 'Đơn vị cơ bản', 'Quy cách (SL/Kiện)', 'Giá nhập (VNĐ)', 'Giá xuất (VNĐ)', 'Mã vạch (Barcode)']
+            ).map(
+                highlight_negative, subset=['Tồn kho']
+            )
             st.dataframe(styled_df, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm linh kiện mới ở mục bên trái!")
@@ -174,8 +164,8 @@ with main_col:
                     st.write(f"**Tên:** {item_row.get('Ten_LK', '')}")
                     st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
                     st.write(f"**📦 Quy cách đóng gói:** 1 Kiện = {item_row.get('Quy_cach', 1)} {item_row.get('Don_vi', 'Cái')}")
-                    st.write(f"**💰 Giá nhập:** {format_money(item_row.get('Gia_nhap', 0))} VNĐ")
-                    st.write(f"**🏷️ Giá xuất:** {format_money(item_row.get('Gia_xuat', 0))} VNĐ")
+                    st.write(f"**💰 Giá nhập:** {item_row.get('Gia_nhap', 0):,}".replace(",", ".") + " VNĐ")
+                    st.write(f"**🏷️ Giá xuất:** {item_row.get('Gia_xuat', 0):,}".replace(",", ".") + " VNĐ")
                     st.write(f"**🪪 Mã vạch (Barcode):** `{item_row.get('Barcode', 'Chưa có')}`")
                     thanh_phan = item_row.get('Thanh_phan', None)
                     if thanh_phan and isinstance(thanh_phan, list) and len(thanh_phan) > 0:
@@ -190,7 +180,7 @@ with main_col:
                             sub_match = df[df["Ma_LK"] == sub_m]
                             if not sub_name and not sub_match.empty:
                                 sub_name = sub_match.iloc[0]["Ten_LK"]
-                            gia_str = f" | Giá: **{format_money(sub_gia)} VNĐ**" if sub_gia else ""
+                            gia_str = f" | Giá: **{sub_gia:,} VNĐ**".replace(",", ".") if sub_gia else ""
                             st.write(f"- `{sub_m}` ({sub_name}) | Định mức: **{sub_sl} {sub_dv}**{gia_str}")
                             if sub_img:
                                 st.image(sub_img, width=80)
