@@ -211,81 +211,67 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
-        if "edit_mode" not in st.session_state:
-            st.session_state.edit_mode = "➕ Nhập mới hoàn toàn"
-        if "loaded_combo_data" not in st.session_state:
-            st.session_state.loaded_combo_data = None
-        che_do_nhap = st.radio(
-            "⚙️ Chọn phương thức khai báo Combo:",
-            ["➕ Nhập mới hoàn toàn", "🔄 Lấy theo dữ liệu Combo cũ để chỉnh sửa (thêm/bớt thành phần)"],
-            horizontal=True,
-            index=0 if st.session_state.edit_mode == "➕ Nhập mới hoàn toàn" else 1,
-            key="che_do_nhap_radio_stable"
-        )
-        if che_do_nhap != st.session_state.edit_mode:
-            st.session_state.edit_mode = che_do_nhap
-            if che_do_nhap.startswith("➕"):
-                st.session_state.loaded_combo_data = None
-            st.rerun()
+        if "loaded_cb_code" not in st.session_state:
+            st.session_state.loaded_cb_code = ""
         combo_dict = {}
         if not df.empty:
             c_df = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             for _, r in c_df.iterrows():
                 d_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
                 combo_dict[d_str] = r.to_dict()
-        if che_do_nhap.startswith("🔄"):
-            if combo_dict:
-                col_sel1, col_sel2 = st.columns([3, 1])
-                with col_sel1:
-                    chosen_cb_str = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", list(combo_dict.keys()), key="select_combo_box_stable")
-                with col_sel2:
-                    st.write("")
-                    st.write("")
-                    if st.button("🔄 Tải dữ liệu cũ"):
-                        st.session_state.loaded_combo_data = combo_dict[chosen_cb_str]
-                        st.success(f"Đã tải dữ liệu của {chosen_cb_str}!")
-                        st.rerun()
-            else:
-                st.warning("Chưa có mã Combo nào trong hệ thống!")
-        active_data = st.session_state.loaded_combo_data
-        def_ma = active_data.get("Ma_LK", "") if active_data else ""
-        def_ten = active_data.get("Ten_LK", "") if active_data else ""
-        def_dv = active_data.get("Don_vi", "Bộ") if active_data and active_data.get("Don_vi") in ["Bộ", "Hộp", "Combo"] else "Bộ"
-        def_img = active_data.get("Hinh_anh", "") if active_data and active_data.get("Hinh_anh") else ""
-        def_tp = active_data.get("Thanh_phan", []) if active_data else []
-        def_gianhap = float(active_data.get("Gia_nhap", 0)) if active_data and active_data.get("Gia_nhap") else 0.0
-        def_giaxuat = float(active_data.get("Gia_xuat", 0)) if active_data and active_data.get("Gia_xuat") else 0.0
-        def_barcode = active_data.get("Barcode", "") if active_data and active_data.get("Barcode") else ""
-        def_quycach = int(active_data.get("Quy_cach", 1)) if active_data and active_data.get("Quy_cach") else 1
+        if combo_dict:
+            st.markdown("### 🔄 Chọn Combo cũ cần chỉnh sửa thông tin / giá:")
+            col_load1, col_load2 = st.columns([3, 1])
+            with col_load1:
+                selected_cb_to_load = st.selectbox("Chọn Combo", list(combo_dict.keys()), key="select_cb_load_box")
+            with col_load2:
+                st.write("")
+                st.write("")
+                if st.button("📥 Tải dữ liệu lên Form"):
+                    st.session_state.loaded_cb_code = selected_cb_to_load.split(" - ")[0]
+                    st.success("Đã tải dữ liệu thành công!")
+                    st.rerun()
+        # Lấy dữ liệu của combo được chọn
+        active_data = {}
+        if st.session_state.loaded_cb_code and not df.empty:
+            matched_rows = df[df["Ma_LK"] == st.session_state.loaded_cb_code]
+            if not matched_rows.empty:
+                active_data = matched_rows.iloc[0].to_dict()
+        def_ma = active_data.get("Ma_LK", "")
+        def_ten = active_data.get("Ten_LK", "")
+        def_dv = active_data.get("Don_vi", "Bộ")
+        def_img = active_data.get("Hinh_anh", "")
+        def_tp = active_data.get("Thanh_phan", [])
+        def_gianhap = float(active_data.get("Gia_nhap", 0)) if active_data.get("Gia_nhap") else 0.0
+        def_giaxuat = float(active_data.get("Gia_xuat", 0)) if active_data.get("Gia_xuat") else 0.0
+        def_barcode = active_data.get("Barcode", "") if active_data.get("Barcode") else ""
+        def_quycach = int(active_data.get("Quy_cach", 1)) if active_data.get("Quy_cach") else 1
+        if st.session_state.loaded_cb_code:
+            st.info(f"Đang chỉnh sửa cho mã Combo: **{st.session_state.loaded_cb_code}**. Bấm nút bên dưới nếu muốn hủy để tạo mới hoàn toàn.")
+            if st.button("➕ Hủy chọn để Nhập mới hoàn toàn"):
+                st.session_state.loaded_cb_code = ""
+                st.rerun()
         st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
         c1, c2 = st.columns(2)
         with c1:
-            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input_stable", placeholder="VD: Bộ bàn gỗ lim 1.2M")
-            auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
-            cb_ma_mode = st.radio(
-                "Phương thức mã Combo:",
-                ["🤖 Tự sinh", "✍️ Tự viết"],
-                horizontal=True,
-                key="cb_ma_mode_radio_stable"
-            )
-            if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo (Mã tự động từ hệ thống)", value=def_ma if (che_do_nhap.startswith("🔄") and def_ma) else auto_cb_code, key="cb_code_auto_val_stable")
-            else:
-                ma_lk = st.text_input("Mã Combo (Cá nhân tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val_stable")
-            don_vi_nhap = st.selectbox("Đơn vị giao dịch khi nhập", ["Đơn vị lẻ (Cái/Bộ)", "📦 Kiện (Đóng thùng)"], key="cb_dv_nhap_stable")
-            so_luong_nhap = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="cb_sl_input_stable")
-            quy_cach = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach, key="cb_quycach_input_stable")
+            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input_p", placeholder="VD: Bộ bàn gỗ lim 1.2M")
+            ma_lk = st.text_input("Mã Combo", value=def_ma if def_ma else generate_code_from_name(ten_lk, is_combo=True), key="cb_code_input_p")
+            don_vi_nhap = st.selectbox("Đơn vị giao dịch khi nhập", ["Đơn vị lẻ (Cái/Bộ)", "📦 Kiện (Đóng thùng)"], key="cb_dv_nhap_p")
+            so_luong_nhap = st.number_input("Số lượng nhập thêm", min_value=0, step=1, value=0, key="cb_sl_input_p")
+            quy_cach = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach, key="cb_quycach_input_p")
             so_luong_thuc_te = so_luong_nhap * quy_cach if don_vi_nhap.startswith("📦") else so_luong_nhap
-            barcode = st.text_input("Mã vạch (Barcode)", value=def_barcode, placeholder="Quét hoặc nhập mã vạch...", key="cb_barcode_input_stable")
+            barcode = st.text_input("Mã vạch (Barcode)", value=def_barcode, placeholder="Quét hoặc nhập mã vạch...", key="cb_barcode_input_p")
         with c2:
-            don_vi = st.selectbox("Đơn vị tính cơ bản", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input_stable")
-            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="cb_op_input_stable")
-            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0.0, step=1000.0, value=def_gianhap, key="cb_gianhap_input_stable")
-            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0.0, step=1000.0, value=def_giaxuat, key="cb_giaxuat_input_stable")
-            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img, key="cb_img_input_stable")
+            dv_list = ["Bộ", "Hộp", "Combo"]
+            dv_idx = dv_list.index(def_dv) if def_dv in dv_list else 0
+            don_vi = st.selectbox("Đơn vị tính cơ bản", dv_list, index=dv_idx, key="cb_dv_input_p")
+            loai_gd = st.selectbox("Loại thao tác", ["🔄 Cập nhật thông tin / Giá", "📥 Nhập kho mới (Cộng dồn)"], key="cb_op_input_p")
+            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0.0, step=1000.0, value=def_gianhap, key="cb_gianhap_input_p")
+            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0.0, step=1000.0, value=def_giaxuat, key="cb_giaxuat_input_p")
+            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img, key="cb_img_input_p")
         if don_vi_nhap.startswith("📦") and so_luong_nhap > 0:
             st.info(f"💡 Quy đổi hệ thống: **{so_luong_nhap} Kiện** x {quy_cach} = **{so_luong_thuc_te} {don_vi}** sẽ được cộng vào kho.")
-        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo", key="cb_note_input_stable")
+        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật giá và thành phần combo", key="cb_note_input_p")
         st.markdown("---")
         st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN")
         def get_tp_val(idx, field):
@@ -294,61 +280,24 @@ with main_col:
                 return val if val is not None else ""
             return ""
         tps_input = []
-        generated_codes_in_form = []
         for i in range(1, 11):
             st.markdown(f"**Thành phần {i}**")
             sub_c1, sub_c2, sub_c_dv = st.columns([3, 1, 1])
             with sub_c1:
-                t_name = st.text_input(
-                    f"Tên đầy đủ linh kiện/vật tư {i}", 
-                    value=str(get_tp_val(i-1, 'ten')), 
-                    key=f"live_tp{i}_ten_stable", 
-                    placeholder="VD: Bulong 10.9 mạ dacromet M24x90"
-                )
+                t_name = st.text_input(f"Tên linh kiện {i}", value=str(get_tp_val(i-1, 'ten')), key=f"tp_{i}_ten_p")
             with sub_c2:
-                t_sl = st.number_input(
-                    f"Định mức {i}", 
-                    min_value=1, 
-                    value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, 
-                    key=f"live_tp{i}_s_stable"
-                )
+                t_sl = st.number_input(f"Định mức {i}", min_value=1, value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, key=f"tp_{i}_sl_p")
             with sub_c_dv:
-                old_dv_val = get_tp_val(i-1, 'dv')
-                dv_list = ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"]
-                dv_idx = dv_list.index(old_dv_val) if old_dv_val in dv_list else 0
-                t_dv = st.selectbox(
-                    f"Đơn vị tính {i}",
-                    dv_list,
-                    index=dv_idx,
-                    key=f"live_tp{i}_dv_stable"
-                )
-            sub_type_col1, sub_type_col2 = st.columns(2)
-            with sub_type_col1:
-                item_cat = st.radio(
-                    f"Phân loại thành phần {i}:",
-                    ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"],
-                    horizontal=True,
-                    key=f"tp{i}_cat_radio_stable"
-                )
-            with sub_type_col2:
-                tp_ma_choice = st.radio(
-                    f"Phương thức mã cho Thành phần {i}:",
-                    ["🤖 Tự sinh", "✍️ Tự viết"],
-                    horizontal=True,
-                    key=f"tp{i}_method_radio_stable"
-                )
-            prefix_type = "LK" if "LK" in item_cat else "VT"
-            auto_generated_code = generate_code_from_name(t_name, is_combo=False, item_type=prefix_type)
-            old_saved_code = get_tp_val(i-1, 'ma')
+                old_dv = get_tp_val(i-1, 'dv')
+                dv_sub_list = ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"]
+                dv_s_idx = dv_sub_list.index(old_dv) if old_dv in dv_sub_list else 0
+                t_dv = st.selectbox(f"Đơn vị {i}", dv_sub_list, index=dv_s_idx, key=f"tp_{i}_dv_p")
+            old_code = get_tp_val(i-1, 'ma')
             sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
-                if tp_ma_choice.startswith("🤖"):
-                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Mã tự động từ hệ thống)", value=old_saved_code if (che_do_nhap.startswith("🔄") and old_saved_code) else auto_generated_code, key=f"live_tp{i}_code_auto_val_stable")
-                else:
-                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Tự viết)", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual_val_stable")
+                final_tp_code = st.text_input(f"Mã linh kiện {i}", value=old_code if old_code else generate_code_from_name(t_name, is_combo=False), key=f"tp_{i}_ma_p")
             with sub_c4:
-                t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i_stable")
-            generated_codes_in_form.append(final_tp_code)
+                t_img = st.text_input(f"Link ảnh {i}", value=str(get_tp_val(i-1, 'img')), key=f"tp_{i}_img_p")
             st.markdown("---")
             tps_input.append({
                 "ten": t_name,
@@ -364,14 +313,16 @@ with main_col:
                 try:
                     ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                     nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong_thuc_te} {don_vi} ({so_luong_nhap} {don_vi_nhap})"
+                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong_thuc_te} {don_vi}"
                     if ghi_chu_tay:
                         nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
                     current_stock_to_save = so_luong_thuc_te
                     if not df.empty and ma_lk in df["Ma_LK"].values:
                         old_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-                        if loai_gd == "📥 Nhập kho mới":
+                        if loai_gd.startswith("📥"):
                             current_stock_to_save = int(old_row["So_luong"]) + int(so_luong_thuc_te)
+                        else:
+                            current_stock_to_save = int(old_row["So_luong"]) # Giữ nguyên tồn kho nếu chỉ cập nhật thông tin/giá
                         old_logs = old_row.get("Nhat_ky", "")
                         if old_logs:
                             nhat_ky_str = old_logs + "\n" + nhat_ky_str
@@ -389,7 +340,7 @@ with main_col:
                         "Quy_cach": int(quy_cach)
                     }
                     supabase.table("Ton_kho").upsert(new_data).execute()
-                    st.session_state.loaded_combo_data = None
+                    st.session_state.loaded_cb_code = ""
                     st.success("Đã lưu thành công dữ liệu Combo vào Database!")
                     st.rerun()
                 except Exception as e:
