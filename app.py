@@ -4,6 +4,7 @@ from datetime import datetime, date
 from supabase import create_client, Client
 import json
 import io
+import re
 # Cấu hình giao diện chiếm toàn màn hình
 st.set_page_config(page_title="Quản Lý Kho Cá Nhân", page_icon="📦", layout="wide")
 # Khởi tạo kết nối Supabase an toàn tuyệt đối từ Secrets
@@ -23,6 +24,43 @@ def load_data():
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
 df = load_data()
+# Hàm thông minh tự động sinh mã cơ khí từ tên sản phẩm
+def generate_code_from_name(full_name):
+    if not full_name:
+        return ""
+    name_clean = full_name.strip()
+    upper_name = name_clean.upper()
+    # 1. Xác định tiền tố loại (TAN hoặc BL hoặc VT...)
+    prefix = "VT"
+    if "TÁN" in upper_name or "Ê-CU" in upper_name or "ECU" in upper_name:
+        prefix = "TAN"
+    elif "BULONG" in upper_name or "BU LÔNG" in upper_name:
+        prefix = "BL"
+    elif "VÍT" in upper_name:
+        prefix = "VIT"
+    elif "LONG ĐỀN" in upper_name or "VÒNG ĐỆM" in upper_name:
+        prefix = "LD"
+    # 2. Tìm kích thước dạng M... hoặc ...x... (VD: M14, M24x115, M12X30)
+    size_match = re.search(r'M\d+(?:[xX]\d+)?', upper_name)
+    size_str = size_match.group(0).replace('X', 'x') if size_match else "GENERAL"
+    # 3. Tìm cấp bền (VD: 5.6, 10.9, 4.6...)
+    grade_match = re.search(r'\b\d+\.\d+\b', upper_name)
+    grade_str = f"_{grade_match.group(0)}" if grade_match else ""
+    # 4. Tìm xử lý bề mặt (Mạ nhúng nóng, mạ dacromet, mạ...)
+    surface_code = ""
+    if "NHÚNG NÓNG" in upper_name:
+        surface_code = "_NN"
+    elif "DACROMET" in upper_name:
+        surface_code = "_DC"
+    elif "MẠ" in upper_name:
+        surface_code = "_MA"
+    elif "NGẠNH" in upper_name:
+        surface_code = "_NGANH"
+    # Tổng hợp thành mã chuẩn độc nhất
+    auto_code = f"{prefix}-{size_str}{grade_str}{surface_code}"
+    # Loại bỏ ký tự thừa nếu có
+    auto_code = re.sub(r'[\s_]+', '_', auto_code).strip('_').upper()
+    return auto_code
 # Quản lý đăng nhập hệ thống
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -155,8 +193,8 @@ with main_col:
             else:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
-            st.warning("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO (Tích hợp cảnh báo trùng mã Combo và trùng mã thành phần)
+            st.info("Kho hiện đang trống.")
+    # 3. NHẬP MỚI COMBO (Tích hợp tự động sinh mã thông minh từ tên gọi cơ khí)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
@@ -201,20 +239,19 @@ with main_col:
             c1, c2 = st.columns(2)
             with c1:
                 ma_lk = st.text_input("Mã Combo (VD: CB-MVRS-01)", value=def_ma)
-                ten_lk = st.text_input("Tên Combo (VD: Bộ cánh quạt xe máy)", value=def_ten)
+                ten_lk = st.text_input("Tên Combo", value=def_ten)
                 so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0)
             with c2:
                 don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0)
                 loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
                 hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
-            # CẢNH BÁO TRÙNG MÃ COMBO NGAY KHI NHẬP
             if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
                 existing_cb_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (Tên: *{existing_cb_row['Ten_LK']}*, Tồn kho hiện tại: *{existing_cb_row['So_luong']} {existing_cb_row['Don_vi']}*). Nếu tiếp tục lưu, hệ thống sẽ cộng dồn số lượng hoặc cập nhật thông tin!")
+                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (Tên: *{existing_cb_row['Ten_LK']}*, Tồn: *{existing_cb_row['So_luong']}*).")
             ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo")
             st.markdown("---")
-            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN TRONG COMBO (Hỗ trợ tối đa 10 thành phần)")
-            st.info("💡 Hệ thống tự động tổng hợp thông tin (Loại, Tên, Kích thước, Đặc điểm) để sinh ra **Mã linh kiện/vật tư tự động** chuẩn hóa.")
+            st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN (Chỉ cần nhập tên, hệ thống tự sinh mã chuẩn cơ khí)")
+            st.info("💡 Ví dụ bạn gõ: `Bulong 10.9 mạ dacromet M24x115`, hệ thống sẽ tự bóc tách và sinh ra mã chuẩn.")
             def get_tp_val(idx, field):
                 if idx < len(def_tp) and isinstance(def_tp, list):
                     val = def_tp[idx].get(field, "")
@@ -224,49 +261,28 @@ with main_col:
             generated_codes_in_form = []
             for i in range(1, 11):
                 st.markdown(f"**Thành phần {i}**")
-                sub_c1, sub_c2, sub_c3 = st.columns([2, 1, 1])
+                sub_c1, sub_c2 = st.columns([3, 1])
                 with sub_c1:
-                    t_name = st.text_input(f"Tên gọi thành phần {i}", value=str(get_tp_val(i-1, 'ten')), key=f"tp{i}_ten", placeholder="VD: Ốc vít, Nắp chụp...")
+                    t_name = st.text_input(f"Tên đầy đủ linh kiện/vật tư {i}", value=str(get_tp_val(i-1, 'ten')), key=f"tp{i}_ten", placeholder="VD: Bulong 10.9 mạ dacromet M24x115")
                 with sub_c2:
-                    t_type = st.selectbox(f"Loại {i}", ["Linh kiện", "Vật tư"], index=0 if get_tp_val(i-1, 'phan_loai') != "Vật tư" else 1, key=f"tp{i}_loai")
-                with sub_c3:
                     t_sl = st.number_input(f"Định mức {i}", min_value=1, value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, key=f"tp{i}_s")
-                sub_c4, sub_c5, sub_c6, sub_c7 = st.columns([1, 1, 1, 2])
-                with sub_c4:
-                    t_dai = st.text_input(f"Dài {i}", value=str(get_tp_val(i-1, 'dai')), key=f"tp{i}_dai", placeholder="VD: 50")
-                with sub_c5:
-                    t_rong = st.text_input(f"Rộng {i}", value=str(get_tp_val(i-1, 'rong')), key=f"tp{i}_rong", placeholder="VD: 20")
-                with sub_c6:
-                    t_cao = st.text_input(f"Cao {i}", value=str(get_tp_val(i-1, 'cao')), key=f"tp{i}_cao", placeholder="VD: 10")
-                with sub_c7:
-                    t_dac_biet = st.text_input(f"Chi tiết đặc biệt {i}", value=str(get_tp_val(i-1, 'dac_biet')), key=f"tp{i}_db", placeholder="VD: Có ren, Không nắp...")
-                sub_c8, sub_c9 = st.columns([3, 1])
-                with sub_c8:
+                sub_c3, sub_c4 = st.columns([3, 1])
+                with sub_c3:
                     t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"tp{i}_i")
-                # Sinh mã tự động
-                prefix = "LK" if t_type == "Linh kiện" else "VT"
-                name_code = "".join([c for c in t_name.upper() if c.isalnum()])[:4] if t_name else "ITEM"
-                size_code = f"_{t_dai}x{t_rong}x{t_cao}" if (t_dai or t_rong or t_cao) else ""
-                db_code = f"_{"".join([c for c in t_dac_biet.upper() if c.isalnum()])[:6]}" if t_dac_biet else ""
-                auto_generated_code = f"{prefix}-{name_code}{size_code}{db_code}" if t_name else ""
-                # CẢNH BÁO TRÙNG MÃ THÀNH PHẦN (Trùng với mã đã có sẵn trong database hoặc trùng ngay trong form khai báo)
+                # Tự động gọi hàm phân tích tên để sinh mã chuẩn
+                auto_generated_code = generate_code_from_name(t_name)
                 if auto_generated_code:
                     if auto_generated_code in generated_codes_in_form:
                         st.error(f"⚠️ **Trùng mã nội bộ:** Mã `{auto_generated_code}` bị trùng với một thành phần khác bên trên!")
                     elif not df.empty and auto_generated_code in df["Ma_LK"].values:
                         matched_dup = df[df["Ma_LK"] == auto_generated_code].iloc[0]
-                        st.info(f"ℹ️ **Thông báo:** Mã tự động `{auto_generated_code}` khớp với mã vật tư đã có trong kho (*{matched_dup['Ten_LK']}* - Tồn: *{matched_dup['So_luong']}*). Hệ thống sẽ liên kết đồng bộ.")
+                        st.info(f"ℹ️ **Thông báo:** Mã tự động `{auto_generated_code}` khớp với mã vật tư đã có trong kho (*{matched_dup['Ten_LK']}* - Tồn: *{matched_dup['So_luong']}*).")
                 generated_codes_in_form.append(auto_generated_code)
-                with sub_c9:
+                with sub_c4:
                     st.text_input(f"Mã tự động {i}", value=auto_generated_code, disabled=True, key=f"tp{i}_autocode")
                 st.markdown("---")
                 tps_input.append({
                     "ten": t_name,
-                    "phan_loai": t_type,
-                    "dai": t_dai,
-                    "rong": t_rong,
-                    "cao": t_cao,
-                    "dac_biet": t_dac_biet,
                     "ma": auto_generated_code,
                     "sl": int(t_sl),
                     "img": t_img.strip() if t_img else ""
@@ -312,7 +328,7 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
-        st.info("💡 Bạn có thể **chọn mã có sẵn từ danh sách** để hệ thống tự điền tên và cập nhật, hoặc **gõ mã mới** để khai báo vật tư lẻ mới.")
+        st.info("💡 Bạn có thể **chọn mã có sẵn từ danh sách** để hệ thống tự điền tên và cập nhật, hoặc **gõ tên sản phẩm mới** để hệ thống tự sinh mã.")
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
@@ -334,17 +350,18 @@ with main_col:
         with st.form("add_item_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
-                ma_lk = st.text_input("Mã LK / VT (VD: LK-CANHQUAT-01)", value=def_ma)
-                ten_lk = st.text_input("Tên linh kiện / vật tư", value=def_ten)
+                ten_lk = st.text_input("Tên linh kiện / vật tư", value=def_ten, placeholder="VD: Tán 10.9 M16")
+                # Tự động sinh mã dựa vào tên nhập vào
+                preview_code = generate_code_from_name(ten_lk) if not def_ma else def_ma
+                ma_lk = st.text_input("Mã LK / VT (Tự động sinh hoặc chỉnh sửa)", value=preview_code)
                 so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0)
             with c2:
                 don_vi = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"], index=["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"].index(def_dv) if def_dv in ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"] else 0)
                 loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
                 hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
-            # CẢNH BÁO TRÙNG MÃ KHI NHẬP LẺ
             if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
                 dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']} {dup_row['Don_vi']}). Bạn nên chọn mã này từ danh sách phía trên thay vì tạo mới để tránh trùng lặp.")
+                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']}).")
             ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới")
             save_btn = st.form_submit_button("💾 Lưu Linh kiện/Vật tư lẻ vào Database")
             if save_btn:
