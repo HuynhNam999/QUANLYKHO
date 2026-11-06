@@ -7,7 +7,7 @@ import io
 import re
 import unicodedata
 # Cấu hình giao diện toàn màn hình
-st.set_page_config(page_title="Quản Lý Kho Cá Nhân", page_icon="📦", layout="wide")
+st.set_page_config(page_title="Quản Lý Đa Kho Cá Nhân", page_icon="📦", layout="wide")
 # CSS căn giữa toàn bộ bảng trong Streamlit
 st.markdown("""
     <style>
@@ -33,7 +33,11 @@ supabase: Client = init_supabase()
 def load_data():
     try:
         response = supabase.table("Ton_kho").select("*").execute()
-        return pd.DataFrame(response.data)
+        df_load = pd.DataFrame(response.data)
+        # Đảm bảo có cột Kho_quan_ly nếu dữ liệu cũ chưa có
+        if not df_load.empty and "Kho_quan_ly" not in df_load.columns:
+            df_load["Kho_quan_ly"] = "Kho Chính"
+        return df_load
     except Exception as e:
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
@@ -74,13 +78,22 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     clean_code = re.sub(r'_+', '_', clean_code).strip('_')
     auto_code = f"{prefix}-{clean_code[:30]}"
     return auto_code.replace("__", "_").upper()
+# Widget hiển thị Hướng dẫn tạo mã dùng chung
+def render_code_guide():
+    with st.expander("💡 HƯỚNG DẪN QUY TẮC TẠO MÃ SẢN PHẨM & COMBO"):
+        st.markdown("""
+        - **Mã Combo (`CB-`)**: Hệ thống tự động gom từ viết tắt của tên Combo (VD: *Bộ bàn ghế phòng khách* $\rightarrow$ `CB-BO_BAN_GHE`).
+        - **Mã Vật Tư (`VT-`)**: Dùng cho các vật tư tiêu hao, bu lông, ốc vít (VD: *Bulong M24* $\rightarrow$ `VT-BL_M24`).
+        - **Mã Linh Kiện (`LK-`)**: Dùng cho các linh kiện thiết bị, máy móc (VD: *Mô tơ cửa cuốn* $\rightarrow$ `LK-MO_TO_CUA_CUON`).
+        - Bạn có thể chọn chế độ **✍️ Tự viết** nếu muốn tự đặt mã theo quy ước riêng của doanh nghiệp.
+        """)
 # Quản lý đăng nhập
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
     st.session_state.username = None
 if not st.session_state.logged_in:
-    st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ KHO")
+    st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ ĐA KHO")
     with st.form("login_form"):
         username_input = st.text_input("Tên đăng nhập")
         password = st.text_input("Mật khẩu", type="password")
@@ -99,8 +112,18 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
+# --- DANH SÁCH KHO HỆ THỐNG ---
+danh_sach_kho_mac_dinh = ["Kho Chính", "Kho Phụ 1", "Kho Tổng Miền Nam", "Kho Ký Gửi"]
+if not df.empty and "Kho_quan_ly" in df.columns:
+    db_kho_list = df["Kho_quan_ly"].dropna().unique().tolist()
+    for k in db_kho_list:
+        if k not in danh_sach_kho_mac_dinh:
+            danh_sach_kho_mac_dinh.append(k)
 # --- MENU ĐIỀU HƯỚNG BÊN TRÁI ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
+st.sidebar.markdown("---")
+st.sidebar.subheader("🏢 Lựa Chọn Kho Quản Lý")
+selected_warehouse = st.sidebar.selectbox("📂 Chọn kho làm việc:", ["🌐 Xem tất cả các kho"] + danh_sach_kho_mac_dinh)
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
 menu_choice = st.sidebar.radio(
@@ -123,51 +146,56 @@ if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.role = None
     st.session_state.username = None
     st.rerun()
+# Lọc DataFrame theo kho được chọn từ sidebar
+df_hien_tai = df.copy()
+if selected_warehouse != "🌐 Xem tất cả các kho" and not df_hien_tai.empty:
+    if "Kho_quan_ly" in df_hien_tai.columns:
+        df_hien_tai = df_hien_tai[df_hien_tai["Kho_quan_ly"] == selected_warehouse]
 # --- GIAO DIỆN CHÍNH BÊN PHẢI ---
 _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
     # 1. TỔNG QUAN TỒN KHO
     if menu_choice == "📊 Tổng quan tồn kho":
-        st.title("📦 TỒN KHO HỆ THỐNG")
-        if not df.empty:
-            df_filtered = df[df["So_luong"] >= 0].copy()
-            for col_check in ["Gia_nhap", "Gia_xuat", "Barcode", "Quy_cach", "So_luong"]:
+        st.title(f"📦 TỒN KHO HỆ THỐNG — [{selected_warehouse.upper()}]")
+        if not df_hien_tai.empty:
+            df_filtered = df_hien_tai[df_hien_tai["So_luong"] >= 0].copy()
+            for col_check in ["Gia_nhap", "Gia_xuat", "Barcode", "Quy_cach", "So_luong", "Kho_quan_ly"]:
                 if col_check not in df_filtered.columns:
-                    df_filtered[col_check] = 1 if col_check == "Quy_cach" else (0 if "Gia" in col_check or col_check == "So_luong" else "")
+                    df_filtered[col_check] = "Kho Chính" if col_check == "Kho_quan_ly" else (1 if col_check == "Quy_cach" else (0 if "Gia" in col_check or col_check == "So_luong" else ""))
             df_filtered["Thanh_tien"] = pd.to_numeric(df_filtered["So_luong"], errors="coerce").fillna(0) * pd.to_numeric(df_filtered["Gia_nhap"], errors="coerce").fillna(0)
             tong_gia_tri_kho = df_filtered["Thanh_tien"].sum()
             tong_so_luong = int(df_filtered["So_luong"].sum())
             col_m1, col_m2, col_m3 = st.columns([2, 2, 3])
             with col_m1:
-                st.metric(label="📊 TỔNG MẶT HÀNG IN KHO", value=f"{len(df_filtered)} sản phẩm")
+                st.metric(label="📊 TỔNG MẶT HÀNG", value=f"{len(df_filtered)} sản phẩm")
             with col_m2:
-                st.metric(label="📦 TỔNG SỐ LƯỢNG TỒN", value=f"{format_money(tong_so_luong)} đơn vị")
+                st.metric(label="📦 TỔNG SỐ LƯỢNG", value=f"{format_money(tong_so_luong)} đơn vị")
             with col_m3:
                 st.metric(label="💰 TỔNG GIÁ TRỊ TỒN KHO", value=f"{format_money(tong_gia_tri_kho)} VNĐ")
             st.markdown("---")
             df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
             df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
-            df_display = df_filtered[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]].copy()
-            df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
+            df_display = df_filtered[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]].copy()
+            df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Kho quản lý", "Tồn kho", "Đơn vị", "Quy cách", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch"]
             st.dataframe(df_display, use_container_width=True, height=500)
         else:
-            st.info("Kho hiện đang trống. Hãy thêm linh kiện mới ở mục bên trái!")
+            st.info(f"Kho **{selected_warehouse}** hiện đang trống. Hãy chọn kho khác hoặc thêm sản phẩm mới!")
     # 2. TRA CỨU & LỌC CHI TIẾT
     elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
-        st.title("🔍 TRA CỨU & LỌC CHI TIẾT SẢN PHẨM")
+        st.title(f"🔍 TRA CỨU & LỌC CHI TIẾT — [{selected_warehouse.upper()}]")
         st.markdown("---")
-        if not df.empty:
+        if not df_hien_tai.empty:
             col_sc1, col_sc2 = st.columns([2, 2])
             with col_sc1:
                 barcode_search = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để tra cứu nhanh", placeholder="Nhấn vào đây rồi quét mã vạch...")
             target_ma_lk = None
             if barcode_search.strip():
-                matched_bc = df[df["Barcode"].str.contains(barcode_search.strip(), case=False, na=False)]
+                matched_bc = df_hien_tai[df_hien_tai["Barcode"].str.contains(barcode_search.strip(), case=False, na=False)]
                 if not matched_bc.empty:
                     target_ma_lk = matched_bc.iloc[0]["Ma_LK"]
                     st.success(f"✨ Đã tìm thấy sản phẩm qua mã vạch: **{matched_bc.iloc[0]['Ten_LK']}** (`{target_ma_lk}`)")
                 else:
-                    st.warning("⚠️ Không tìm thấy sản phẩm nào khớp với mã vạch này.")
+                    st.warning("⚠️ Không tìm thấy sản phẩm nào khớp với mã vạch này trong kho hiện tại.")
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
                 loai_loc = st.selectbox(
@@ -175,17 +203,18 @@ with main_col:
                     ["Tất cả", "📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"]
                 )
             with col_f2:
-                ma_list = df["Ma_LK"].tolist()
+                ma_list = df_hien_tai["Ma_LK"].tolist()
                 default_idx = ma_list.index(target_ma_lk) if target_ma_lk in ma_list else 0
-                selected_item = st.selectbox("Chọn mã linh kiện", ma_list, index=default_idx)
+                selected_item = st.selectbox("Chọn mã linh kiện", ma_list, index=default_idx) if ma_list else None
             with col_f3:
                 bat_tat_ngay = st.checkbox("Lọc theo ngày cụ thể")
                 ngay_chon = st.date_input("Chọn ngày", value=date.today())
             if selected_item:
-                item_row = df[df["Ma_LK"] == selected_item].iloc[0]
+                item_row = df_hien_tai[df_hien_tai["Ma_LK"] == selected_item].iloc[0]
                 st.markdown("### 📄 Thông tin chi tiết sản phẩm / Combo")
                 col_info1, col_info2 = st.columns(2)
                 with col_info1:
+                    st.write(f"**🏢 Kho quản lý:** {item_row.get('Kho_quan_ly', 'Kho Chính')}")
                     st.write(f"**Mã LK/VT/CB:** {item_row.get('Ma_LK', '')}")
                     st.write(f"**Tên:** {item_row.get('Ten_LK', '')}")
                     st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
@@ -203,7 +232,7 @@ with main_col:
                             sub_dv = tp.get('dv', 'Cái')
                             sub_gia = tp.get('gia', 0)
                             sub_img = tp.get('img', '')
-                            sub_match = df[df["Ma_LK"] == sub_m]
+                            sub_match = df_hien_tai[df_hien_tai["Ma_LK"] == sub_m]
                             if not sub_name and not sub_match.empty:
                                 sub_name = sub_match.iloc[0]["Ten_LK"]
                             gia_str = f" | Giá: **{format_money(sub_gia)} VNĐ**" if sub_gia else ""
@@ -217,7 +246,7 @@ with main_col:
                     else:
                         st.info("Chưa có link hình ảnh.")
             st.markdown("### 📋 NHẬT KÝ KHO")
-            filtered_df = df.copy()
+            filtered_df = df_hien_tai.copy()
             if loai_loc != "Tất cả":
                 keyword_map = {
                     "📥 Nhập kho": "Nhập kho",
@@ -233,12 +262,13 @@ with main_col:
             if not filtered_df.empty:
                 st.dataframe(filtered_df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True)
             else:
-                st.warning("Không tìm thấy dữ liệu phù hợp.")
+                st.warning("Không tìm thấy dữ liệu nhật ký phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
     # 3. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO
     elif menu_choice == "✏️ Điều chỉnh thông tin & Giá Combo":
         st.title("✏️ ĐIỀU CHỈNH THÔNG TIN, GIÁ & THÀNH PHẦN COMBO")
+        render_code_guide()
         st.markdown("---")
         if "selected_cb_to_edit" not in st.session_state:
             st.session_state.selected_cb_to_edit = ""
@@ -246,7 +276,7 @@ with main_col:
         if not df.empty:
             c_df = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             for _, r in c_df.iterrows():
-                d_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
+                d_str = f"{r['Ma_LK']} - {r['Ten_LK']} ({r.get('Kho_quan_ly', 'Kho Chính')})"
                 combo_dict[d_str] = r.to_dict()
         if combo_dict:
             col_load1, col_load2 = st.columns([3, 1])
@@ -261,6 +291,7 @@ with main_col:
                     if not matched_load.empty:
                         row_l = matched_load.iloc[0]
                         st.session_state.edit_cb_ten = row_l.get("Ten_LK", "")
+                        st.session_state.edit_cb_kho = row_l.get("Kho_quan_ly", "Kho Chính")
                         st.session_state.edit_cb_dv = row_l.get("Don_vi", "Bộ")
                         st.session_state.edit_cb_qc = int(row_l.get("Quy_cach", 1))
                         st.session_state.edit_cb_bc = row_l.get("Barcode", "")
@@ -298,6 +329,7 @@ with main_col:
                 active_data = matched_rows.iloc[0].to_dict()
         def_ma = active_data.get("Ma_LK", "")
         def_ten = st.session_state.get("edit_cb_ten", active_data.get("Ten_LK", ""))
+        def_kho = st.session_state.get("edit_cb_kho", active_data.get("Kho_quan_ly", "Kho Chính"))
         def_dv = st.session_state.get("edit_cb_dv", active_data.get("Don_vi", "Bộ"))
         def_img = st.session_state.get("edit_cb_img", active_data.get("Hinh_anh", ""))
         def_tp = active_data.get("Thanh_phan", [])
@@ -312,6 +344,8 @@ with main_col:
             with c1:
                 ten_lk_e = st.text_input("Tên Combo", value=def_ten, key="edit_cb_ten")
                 ma_lk_e = st.text_input("Mã Combo (Cố định)", value=def_ma, disabled=True)
+                kho_idx_e = danh_sach_kho_mac_dinh.index(def_kho) if def_kho in danh_sach_kho_mac_dinh else 0
+                kho_quan_ly_e = st.selectbox("🏢 Kho quản lý", danh_sach_kho_mac_dinh, index=kho_idx_e, key="edit_cb_kho")
                 quy_cach_e = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach, key="edit_cb_qc")
                 barcode_e = st.text_input("Mã vạch (Barcode)", value=def_barcode, key="edit_cb_bc")
             with c2:
@@ -415,6 +449,7 @@ with main_col:
                         update_data = {
                             "Ma_LK": target_cb_code,
                             "Ten_LK": ten_lk_e,
+                            "Kho_quan_ly": kho_quan_ly_e,
                             "So_luong": int(old_row["So_luong"]),
                             "Don_vi": don_vi_e,
                             "Nhat_ky": nhat_ky_str,
@@ -435,6 +470,7 @@ with main_col:
     # 4. NHẬP MỚI COMBO
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
+        render_code_guide()
         st.markdown("---")
         c1, c2 = st.columns(2)
         with c1:
@@ -445,6 +481,7 @@ with main_col:
                 ma_lk = st.text_input("Mã Combo (Tự động)", value=auto_cb_code, key="new_cb_autocode")
             else:
                 ma_lk = st.text_input("Mã Combo (Tự viết)", value=auto_cb_code, key="new_cb_manualcode")
+            kho_nhap_cb = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, key="new_cb_kho")
             don_vi = st.selectbox("Đơn vị tính cơ bản của Combo", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
             hinh_thuc_nhap_cb = st.radio(
                 "Hình thức nhập kho:",
@@ -552,12 +589,13 @@ with main_col:
                 try:
                     ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                     nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập kho mới: {so_luong_thuc_te} {don_vi}"
+                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập kho '{kho_nhap_cb}': {so_luong_thuc_te} {don_vi}"
                     if ghi_chu_tay:
                         nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
                     new_data = {
                         "Ma_LK": ma_lk,
                         "Ten_LK": ten_lk,
+                        "Kho_quan_ly": kho_nhap_cb,
                         "So_luong": int(so_luong_thuc_te),
                         "Don_vi": don_vi,
                         "Nhat_ky": nhat_ky_str,
@@ -578,13 +616,14 @@ with main_col:
     # 5. NHẬP MỚI LINH KIỆN LẺ
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
+        render_code_guide()
         st.markdown("---")
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
             df_le = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             for _, r in df_le.iterrows():
-                display_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
+                display_str = f"{r['Ma_LK']} - {r['Ten_LK']} ({r.get('Kho_quan_ly', 'Kho Chính')})"
                 existing_items.append(display_str)
                 item_dict[display_str] = r.to_dict()
         if "le_selected_val" not in st.session_state:
@@ -595,6 +634,7 @@ with main_col:
                 row_data = item_dict[sel]
                 st.session_state.le_ten_input_val = row_data.get("Ten_LK", "")
                 st.session_state.le_ma_input_val = row_data.get("Ma_LK", "")
+                st.session_state.le_kho_val = row_data.get("Kho_quan_ly", "Kho Chính")
                 st.session_state.le_dv_input_val = row_data.get("Don_vi", "Cái")
                 st.session_state.le_img_input_val = row_data.get("Hinh_anh", "")
                 st.session_state.le_gianhap_val = int(row_data.get("Gia_nhap", 0)) if row_data.get("Gia_nhap") else 0
@@ -605,6 +645,7 @@ with main_col:
             else:
                 st.session_state.le_ten_input_val = ""
                 st.session_state.le_ma_input_val = ""
+                st.session_state.le_kho_val = "Kho Chính"
                 st.session_state.le_dv_input_val = "Cái"
                 st.session_state.le_img_input_val = ""
                 st.session_state.le_gianhap_val = 0
@@ -622,6 +663,8 @@ with main_col:
             st.session_state.le_ten_input_val = ""
         if "le_ma_input_val" not in st.session_state:
             st.session_state.le_ma_input_val = ""
+        if "le_kho_val" not in st.session_state:
+            st.session_state.le_kho_val = "Kho Chính"
         if "le_dv_input_val" not in st.session_state:
             st.session_state.le_dv_input_val = "Cái"
         if "le_img_input_val" not in st.session_state:
@@ -647,6 +690,8 @@ with main_col:
             if ten_lk != st.session_state.le_ten_input_val:
                 st.session_state.le_ten_input_val = ten_lk
                 st.rerun()
+            kho_idx_le = danh_sach_kho_mac_dinh.index(st.session_state.le_kho_val) if st.session_state.le_kho_val in danh_sach_kho_mac_dinh else 0
+            kho_nhap_le = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, index=kho_idx_le, key="le_kho_widget")
             sub_col_type, sub_col_method = st.columns(2)
             with sub_col_type:
                 item_cat_le = st.radio(
@@ -697,7 +742,7 @@ with main_col:
             hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=st.session_state.le_img_input_val, key="le_img_input")
         if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
             dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']}).")
+            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho **{dup_row.get('Kho_quan_ly', 'Kho Chính')}** với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']}).")
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới", key="le_note_input")
         st.markdown("")
         if st.button("💾 Lưu Linh kiện/Vật tư lẻ vào Database", type="primary", use_container_width=True):
@@ -705,7 +750,7 @@ with main_col:
                 try:
                     ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                     nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong_thuc_te_le} {don_vi}"
+                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd} tại kho '{kho_nhap_le}': {so_luong_thuc_te_le} {don_vi}"
                     if ghi_chu_tay:
                         nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
                     old_tp = []
@@ -721,6 +766,7 @@ with main_col:
                     new_data = {
                         "Ma_LK": ma_lk,
                         "Ten_LK": ten_lk,
+                        "Kho_quan_ly": kho_nhap_le,
                         "So_luong": int(current_stock_le),
                         "Don_vi": don_vi,
                         "Nhat_ky": nhat_ky_str,
@@ -746,15 +792,16 @@ with main_col:
         if not df.empty:
             combo_df = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
             if not combo_df.empty:
-                break_options = [f"{row['Ma_LK']} - {row['Ten_LK']} (Tồn: {row['So_luong']} {row['Don_vi']})" for _, row in combo_df.iterrows()]
+                break_options = [f"{row['Ma_LK']} - {row['Ten_LK']} (Kho: {row.get('Kho_quan_ly', 'Kho Chính')} | Tồn: {row['So_luong']} {row['Don_vi']})" for _, row in combo_df.iterrows()]
                 selected_break_opt = st.selectbox("1️⃣ Chọn bộ Combo cần xé lẻ", break_options)
                 selected_cb_ma = selected_break_opt.split(" - ")[0]
                 cb_row = df[df["Ma_LK"] == selected_cb_ma].iloc[0]
                 cb_ten = cb_row["Ten_LK"]
+                cb_kho = cb_row.get("Kho_quan_ly", "Kho Chính")
                 cb_ton = int(cb_row["So_luong"])
                 cb_dv = cb_row["Don_vi"]
                 cb_tp = cb_row.get("Thanh_phan", [])
-                st.warning(f"📦 **Combo chọn:** {cb_ten} (`{selected_cb_ma}`) | Tồn kho: **{cb_ton} {cb_dv}**")
+                st.warning(f"📦 **Combo chọn:** {cb_ten} (`{selected_cb_ma}`) | Kho: **{cb_kho}** | Tồn kho: **{cb_ton} {cb_dv}**")
                 if cb_tp and isinstance(cb_tp, list) and len(cb_tp) > 0:
                     st.markdown("### 🔗 Các linh kiện con sẽ được cộng vào kho khi xé lẻ:")
                     for tp in cb_tp:
@@ -801,6 +848,7 @@ with main_col:
                                         supabase.table("Ton_kho").upsert({
                                             "Ma_LK": sub_m,
                                             "Ten_LK": sub_name_con,
+                                            "Kho_quan_ly": cb_kho,
                                             "So_luong": sub_ton_moi,
                                             "Don_vi": sub_dv_con,
                                             "Nhat_ky": sub_log_moi,
@@ -812,13 +860,14 @@ with main_col:
                                         supabase.table("Ton_kho").upsert({
                                             "Ma_LK": sub_m,
                                             "Ten_LK": sub_name_con,
+                                            "Kho_quan_ly": cb_kho,
                                             "So_luong": sub_sl_tang,
                                             "Don_vi": sub_dv_con,
                                             "Nhat_ky": sub_log_moi,
                                             "Hinh_anh": tp.get("img", ""),
                                             "Thanh_phan": []
                                         }).execute()
-                                st.success("Xé lẻ Combo thành công! Đã trừ số lượng bộ Combo và tự động cộng bù linh kiện con vào kho lẻ.")
+                                st.success("Xé lẻ Combo thành công! Đã trừ số lượng bộ Combo và tự động cộng bù linh kiện con vào kho.")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Lỗi khi thực hiện xé lẻ: {e}")
@@ -846,7 +895,7 @@ with main_col:
                         st.success(f"✨ Đã nhận diện Combo: **{matched_cb_bc.iloc[0]['Ten_LK']}** (`{target_cb_ma}`)")
                     else:
                         st.warning("⚠️ Không tìm thấy Combo nào khớp với mã vạch này.")
-                export_options = [f"{row['Ma_LK']} - {row['Ten_LK']}" for _, row in combo_df.iterrows()]
+                export_options = [f"{row['Ma_LK']} - {row['Ten_LK']} (Kho: {row.get('Kho_quan_ly', 'Kho Chính')})" for _, row in combo_df.iterrows()]
                 default_cb_idx = 0
                 if target_cb_ma:
                     for idx, opt in enumerate(export_options):
@@ -857,12 +906,13 @@ with main_col:
                 selected_export_item = selected_export_opt.split(" - ")[0]
                 current_item_row = df[df["Ma_LK"] == selected_export_item].iloc[0]
                 hien_thi_ten = current_item_row["Ten_LK"]
+                kho_xuat_cb = current_item_row.get("Kho_quan_ly", "Kho Chính")
                 ton_hien_tai = current_item_row["So_luong"]
                 don_vi_tinh = current_item_row["Don_vi"]
                 hinh_anh_cu = current_item_row["Hinh_anh"]
                 thanh_phan_list = current_item_row.get("Thanh_phan", [])
                 quy_cach_cb = int(current_item_row.get("Quy_cach", 1))
-                st.warning(f"📦 **Combo chọn:** {hien_thi_ten} (`{selected_export_item}`) | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}** (1 Kiện = {quy_cach_cb} {don_vi_tinh})")
+                st.warning(f"📦 **Combo chọn:** {hien_thi_ten} (`{selected_export_item}`) | Kho: **{kho_xuat_cb}** | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}** (1 Kiện = {quy_cach_cb} {don_vi_tinh})")
                 if thanh_phan_list and isinstance(thanh_phan_list, list) and len(thanh_phan_list) > 0:
                     st.info("🔗 **Các linh kiện/vật tư con bên trong sẽ được trừ tự động theo định mức:**")
                     for tp in thanh_phan_list:
@@ -893,12 +943,13 @@ with main_col:
                             nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
                             ngay_gio_str = ngay_xuat.strftime("%d/%m/%Y") + " " + datetime.now().strftime("%H:%M")
                             so_luong_moi = int(ton_hien_tai) - int(so_luong_xuat)
-                            nhat_ky_xuat = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📤 Xuất Combo: {so_luong_xuat} {don_vi_tinh}"
+                            nhat_ky_xuat = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📤 Xuất Combo tại kho '{kho_xuat_cb}': {so_luong_xuat} {don_vi_tinh}"
                             if noi_dung_xuat:
                                 nhat_ky_xuat += f" | Nội dung: {noi_dung_xuat}"
                             update_data = {
                                 "Ma_LK": selected_export_item,
                                 "Ten_LK": hien_thi_ten,
+                                "Kho_quan_ly": kho_xuat_cb,
                                 "So_luong": so_luong_moi,
                                 "Don_vi": don_vi_tinh,
                                 "Nhat_ky": nhat_ky_xuat,
@@ -939,6 +990,7 @@ with main_col:
             for _, row in df.iterrows():
                 m = row["Ma_LK"]
                 t = row["Ten_LK"]
+                kho = row.get("Kho_quan_ly", "Kho Chính")
                 dv = row["Don_vi"]
                 sl = row["So_luong"]
                 img = row.get("Hinh_anh", "")
@@ -946,7 +998,7 @@ with main_col:
                 bc = row.get("Barcode", "")
                 if not m.startswith(("CB", "CM")):
                     if m not in all_items_dict:
-                        all_items_dict[m] = {"Ten_LK": t, "So_luong": sl, "Don_vi": dv, "Hinh_anh": img, "Quy_cach": qc, "Barcode": bc}
+                        all_items_dict[m] = {"Ten_LK": t, "Kho_quan_ly": kho, "So_luong": sl, "Don_vi": dv, "Hinh_anh": img, "Quy_cach": qc, "Barcode": bc}
                 tp_list = row.get("Thanh_phan", [])
                 if tp_list and isinstance(tp_list, list):
                     for tp in tp_list:
@@ -958,6 +1010,7 @@ with main_col:
                             if not sub_match.empty:
                                 all_items_dict[sub_m] = {
                                     "Ten_LK": sub_match.iloc[0]["Ten_LK"],
+                                    "Kho_quan_ly": sub_match.iloc[0].get("Kho_quan_ly", "Kho Chính"),
                                     "So_luong": sub_match.iloc[0]["So_luong"],
                                     "Don_vi": sub_match.iloc[0]["Don_vi"],
                                     "Hinh_anh": sub_match.iloc[0].get("Hinh_anh", ""),
@@ -967,6 +1020,7 @@ with main_col:
                             else:
                                 all_items_dict[sub_m] = {
                                     "Ten_LK": sub_name,
+                                    "Kho_quan_ly": kho,
                                     "So_luong": 0,
                                     "Don_vi": sub_dv,
                                     "Hinh_anh": tp.get("img", ""),
@@ -985,7 +1039,7 @@ with main_col:
                         break
                 if not target_le_ma:
                     st.warning("⚠️ Không tìm thấy linh kiện nào khớp với mã vạch này.")
-            export_options = [f"{m} - {info['Ten_LK']}" for m, info in all_items_dict.items()]
+            export_options = [f"{m} - {info['Ten_LK']} (Kho: {info['Kho_quan_ly']})" for m, info in all_items_dict.items()]
             default_le_idx = 0
             if target_le_ma:
                 for idx, opt in enumerate(export_options):
@@ -997,11 +1051,12 @@ with main_col:
                 selected_export_item = selected_export_opt.split(" - ")[0]
                 current_info = all_items_dict[selected_export_item]
                 hien_thi_ten = current_info["Ten_LK"]
+                kho_xuat_le = current_info["Kho_quan_ly"]
                 ton_hien_tai = current_info["So_luong"]
                 don_vi_tinh = current_info["Don_vi"]
                 hinh_anh_cu = current_info["Hinh_anh"]
                 quy_cach_le_xuat = current_info["Quy_cach"]
-                st.warning(f"🔩 **Linh kiện/Vật tư chọn:** {hien_thi_ten} (`{selected_export_item}`) | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}** (1 Kiện = {quy_cach_le_xuat} {don_vi_tinh})")
+                st.warning(f"🔩 **Linh kiện/Vật tư chọn:** {hien_thi_ten} (`{selected_export_item}`) | Kho: **{kho_xuat_le}** | Tồn kho hiện tại: **{ton_hien_tai} {don_vi_tinh}** (1 Kiện = {quy_cach_le_xuat} {don_vi_tinh})")
                 with st.form("export_item_form", clear_on_submit=True):
                     col_ex1, col_ex2 = st.columns(2)
                     with col_ex1:
@@ -1019,7 +1074,7 @@ with main_col:
                             nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
                             ngay_gio_str = ngay_xuat.strftime("%d/%m/%Y") + " " + datetime.now().strftime("%H:%M")
                             so_luong_moi = int(ton_hien_tai) - int(so_luong_xuat)
-                            nhat_ky_xuat = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📤 Xuất lẻ: {so_luong_xuat} {don_vi_tinh}"
+                            nhat_ky_xuat = f"[{ngay_gio_str}] 👤 {nguoi_thuc_hien} - 📤 Xuất lẻ tại kho '{kho_xuat_le}': {so_luong_xuat} {don_vi_tinh}"
                             if noi_dung_xuat:
                                 nhat_ky_xuat += f" | Nội dung: {noi_dung_xuat}"
                             check_exist = df[df["Ma_LK"] == selected_export_item]
@@ -1033,6 +1088,7 @@ with main_col:
                             update_data = {
                                 "Ma_LK": selected_export_item,
                                 "Ten_LK": hien_thi_ten,
+                                "Kho_quan_ly": kho_xuat_le,
                                 "So_luong": so_luong_moi,
                                 "Don_vi": don_vi_tinh,
                                 "Nhat_ky": nhat_ky_xuat,
@@ -1076,11 +1132,11 @@ with main_col:
         if not df.empty:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_ton_kho = df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Quy_cach"]].copy()
-                df_ton_kho.columns = ["Mã Sản Phẩm / Combo", "Tên Sản Phẩm", "Số Lượng Tồn Kho", "Đơn Vị Tính", "Quy Cách (SL/Kiện)"]
+                df_ton_kho = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach"]].copy()
+                df_ton_kho.columns = ["Mã Sản Phẩm / Combo", "Tên Sản Phẩm", "Kho Quản Lý", "Số Lượng Tồn Kho", "Đơn Vị Tính", "Quy Cách (SL/Kiện)"]
                 df_ton_kho.to_excel(writer, sheet_name='Ton_Kho_Hien_Tai', index=False)
-                df_nhat_ky = df[["Ma_LK", "Ten_LK", "Nhat_ky"]].copy()
-                df_nhat_ky.columns = ["Mã Sản Phẩm", "Tên Sản Phẩm", "Lịch Sử Nhật Ký Chi Tiết"]
+                df_nhat_ky = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Nhat_ky"]].copy()
+                df_nhat_ky.columns = ["Mã Sản Phẩm", "Tên Sản Phẩm", "Kho Quản Lý", "Lịch Sử Nhật Ký Chi Tiết"]
                 df_nhat_ky.to_excel(writer, sheet_name='Lich_Su_Nhat_Ky', index=False)
             excel_data = output.getvalue()
             time_stamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -1092,7 +1148,7 @@ with main_col:
                 st.download_button(
                     label="📥 Tải Báo Cáo Kho Dạng Excel (.xlsx)",
                     data=excel_data,
-                    file_name=f"Bao_Cao_Kho_{time_stamp}.xlsx",
+                    file_name=f"Bao_Cao_Da_Kho_{time_stamp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
         else:
