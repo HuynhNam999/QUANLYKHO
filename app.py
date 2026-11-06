@@ -113,7 +113,7 @@ if st.sidebar.button("🚪 Đăng xuất"):
 # --- GIAO DIỆN CHÍNH BÊN PHẢI ---
 _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
-    # 1. TỔNG QUAN TỒN KHO (Đã cập nhật định dạng tiền kế toán)
+    # 1. TỔNG QUAN TỒN KHO (Căn giữa hoàn toàn các cột số liệu & đơn vị)
     if menu_choice == "📊 Tổng quan tồn kho":
         st.title("📦 TỒN KHO HỆ THỐNG")
         st.markdown("---")
@@ -122,12 +122,18 @@ with main_col:
             for col_check in ["Gia_nhap", "Gia_xuat", "Barcode", "Quy_cach"]:
                 if col_check not in df_filtered.columns:
                     df_filtered[col_check] = 1 if col_check == "Quy_cach" else (0 if "Gia" in col_check else "")
-            # Định dạng các cột tiền tệ chuẩn kế toán trước khi xuất dataframe
             df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
             df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
             df_display = df_filtered[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]]
             df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
-            st.dataframe(df_display, use_container_width=True, height=500)
+            # Sử dụng Pandas Styler để căn giữa toàn bộ các cột từ cột thứ 3 trở đi (hoặc chọn cụ thể tên cột)
+            center_cols = ["Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)", "Mã sản phẩm"]
+            styled_df = df_display.style.set_properties(
+                subset=center_cols, **{'text-align': 'center'}
+            ).set_table_styles([
+                dict(selector='th', props=[('text-align', 'center')])
+            ])
+            st.dataframe(styled_df, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm linh kiện mới ở mục bên trái!")
     # 2. TRA CỨU & LỌC CHI TIẾT
