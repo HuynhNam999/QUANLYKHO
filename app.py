@@ -257,7 +257,6 @@ with main_col:
                 st.write("")
                 if st.button("📥 Nạp dữ liệu cũ lên Form", type="secondary"):
                     st.session_state.selected_cb_to_edit = chosen_combo_str.split(" - ")[0]
-                    # Load dữ liệu chi tiết của combo vào session_state để form hiển thị đúng
                     matched_load = df[df["Ma_LK"] == st.session_state.selected_cb_to_edit]
                     if not matched_load.empty:
                         row_l = matched_load.iloc[0]
@@ -278,6 +277,7 @@ with main_col:
                                 st.session_state[f"ef_tp_{idx_l}_gia"] = int(item_t.get("gia", 0)) if item_t.get("gia") else 0
                                 st.session_state[f"ef_tp_{idx_l}_ma"] = item_t.get("ma", "")
                                 st.session_state[f"ef_tp_{idx_l}_img"] = item_t.get("img", "")
+                                st.session_state[f"ef_tp_{idx_l}_mode"] = "✍️ Tự viết"
                             else:
                                 st.session_state[f"ef_tp_{idx_l}_ten"] = ""
                                 st.session_state[f"ef_tp_{idx_l}_sl"] = 1
@@ -285,6 +285,7 @@ with main_col:
                                 st.session_state[f"ef_tp_{idx_l}_gia"] = 0
                                 st.session_state[f"ef_tp_{idx_l}_ma"] = ""
                                 st.session_state[f"ef_tp_{idx_l}_img"] = ""
+                                st.session_state[f"ef_tp_{idx_l}_mode"] = "🤖 Tự sinh"
                     st.success(f"Đã nạp dữ liệu của `{st.session_state.selected_cb_to_edit}` lên form!")
                     st.rerun()
         else:
@@ -324,7 +325,6 @@ with main_col:
             st.markdown("---")
             st.markdown("### 🧩 THÀNH PHẦN COMBO HIỆN TẠI & GIÁ CHI TIẾT")
             def get_tp_val_e(idx, field):
-                # Ưu tiên lấy từ session_state nếu đã nạp, nếu không lấy từ dữ liệu gốc
                 session_key = f"ef_tp_{idx}_"
                 if field == 'ten': session_key += 'ten'
                 elif field == 'sl': session_key += 'sl'
@@ -341,6 +341,12 @@ with main_col:
             tps_input_e = []
             for i in range(1, 11):
                 st.markdown(f"**Thành phần {i}**")
+                ef_mode_key = f"ef_tp_{i}_mode"
+                ef_type_key = f"ef_tp_{i}_type"
+                if ef_mode_key not in st.session_state:
+                    st.session_state[ef_mode_key] = "🤖 Tự sinh" if not get_tp_val_e(i, 'ma') else "✍️ Tự viết"
+                if ef_type_key not in st.session_state:
+                    st.session_state[ef_type_key] = "⚙️ Linh kiện (LK)" if str(get_tp_val_e(i, 'ma')).startswith("LK") else "🔩 Vật tư (VT)"
                 sub_c1, sub_c2, sub_c_dv, sub_c_gia = st.columns([3, 1, 1, 1.5])
                 with sub_c1:
                     t_name_e = st.text_input(f"Tên linh kiện {i}", value=str(get_tp_val_e(i, 'ten')), key=f"ef_tp_{i}_ten")
@@ -356,10 +362,31 @@ with main_col:
                     old_gia_e = get_tp_val_e(i, 'gia')
                     val_gia = int(old_gia_e) if old_gia_e and str(old_gia_e).replace('.','',1).isdigit() else 0
                     t_gia_e = st.number_input(f"Giá linh kiện {i} (VNĐ)", min_value=0, step=1000, value=val_gia, format="%d", key=f"ef_tp_{i}_gia")
+                col_e_type, col_e_mode = st.columns(2)
+                with col_e_type:
+                    item_cat_tp_e = st.radio(
+                        f"Phân loại thành phần {i}:",
+                        ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"],
+                        horizontal=True,
+                        key=ef_type_key
+                    )
+                with col_e_mode:
+                    item_mode_tp_e = st.radio(
+                        f"Phương thức mã thành phần {i}:",
+                        ["🤖 Tự sinh", "✍️ Tự viết"],
+                        horizontal=True,
+                        key=ef_mode_key
+                    )
+                prefix_tp_e = "LK" if "LK" in item_cat_tp_e else "VT"
+                auto_code_tp_e = generate_code_from_name(t_name_e, is_combo=False, item_type=prefix_tp_e)
                 old_code_e = get_tp_val_e(i, 'ma')
                 sub_c3, sub_c4 = st.columns([3, 1])
                 with sub_c3:
-                    final_tp_code_e = st.text_input(f"Mã linh kiện {i}", value=str(old_code_e) if old_code_e else generate_code_from_name(t_name_e, is_combo=False), key=f"ef_tp_{i}_ma")
+                    if item_mode_tp_e.startswith("🤖"):
+                        final_tp_code_e = st.text_input(f"Mã linh kiện {i} (Tự động từ hệ thống)", value=auto_code_tp_e, key=f"ef_tp_{i}_show_auto", disabled=True)
+                    else:
+                        manual_e_def = old_code_e if old_code_e else auto_code_tp_e
+                        final_tp_code_e = st.text_input(f"Mã linh kiện {i} (Cá nhân tự viết)", value=str(manual_e_def), key=f"ef_tp_{i}_ma")
                 with sub_c4:
                     t_img_e = st.text_input(f"Link ảnh {i}", value=str(get_tp_val_e(i, 'img')), key=f"ef_tp_{i}_img")
                 st.markdown("---")
