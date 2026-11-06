@@ -46,10 +46,8 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
         short_str = "_".join(parts[:3]) if len(parts) > 3 else clean_code
         return f"CB-{short_str[:25]}"
     prefix = item_type if item_type in ["LK", "VT"] else "VT"
-    # Viết tắt các từ khóa thông dụng để mã gọn gàng nhưng vẫn giữ chi tiết kích thước phía sau
     upper_name = upper_name.replace("BULONG", "BL").replace("BU LONG", "BL")
     upper_name = upper_name.replace("LONG DEN", "LD").replace("LON DEN", "LD")
-    # Chỉ cho phép chữ cái, số, dấu chấm (.) và dấu gạch, loại bỏ ngoặc đơn và ký tự đặc biệt khác
     clean_code = re.sub(r'[^A-Z0-9\.]', '_', upper_name)
     clean_code = re.sub(r'_+', '_', clean_code).strip('_')
     auto_code = f"{prefix}-{clean_code[:30]}"
@@ -114,11 +112,16 @@ with main_col:
             def highlight_negative(val):
                 color = 'red' if isinstance(val, (int, float)) and val < 0 else 'black'
                 return f'color: {color}; text-align: center;'
-            df_display = df_filtered[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Nhat_ky"]]
+            # Đảm bảo các cột mới hiển thị nếu có trong database
+            for col_check in ["Gia_nhap", "Gia_xuat", "Barcode"]:
+                if col_check not in df_filtered.columns:
+                    df_filtered[col_check] = 0 if "Gia" in col_check else ""
+            df_display = df_filtered[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Gia_nhap", "Gia_xuat", "Barcode"]]
+            df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Tồn kho", "Đơn vị", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
             styled_df = df_display.style.map(
-                lambda x: 'text-align: center;', subset=['Ma_LK', 'So_luong', 'Don_vi']
+                lambda x: 'text-align: center;', subset=['Mã sản phẩm', 'Tồn kho', 'Đơn vị', 'Giá nhập (VNĐ)', 'Giá xuất (VNĐ)', 'Mã vạch (Barcode)']
             ).map(
-                highlight_negative, subset=['So_luong']
+                highlight_negative, subset=['Tồn kho']
             )
             st.dataframe(styled_df, use_container_width=True, height=500)
         else:
@@ -147,6 +150,9 @@ with main_col:
                     st.write(f"**Mã LK/VT/CB:** {item_row.get('Ma_LK', '')}")
                     st.write(f"**Tên:** {item_row.get('Ten_LK', '')}")
                     st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
+                    st.write(f"**💰 Giá nhập:** {item_row.get('Gia_nhap', 0):,}".replace(",", ".") + " VNĐ")
+                    st.write(f"**🏷️ Giá xuất:** {item_row.get('Gia_xuat', 0):,}".replace(",", ".") + " VNĐ")
+                    st.write(f"**🪪 Mã vạch (Barcode):** `{item_row.get('Barcode', 'Chưa có')}`")
                     thanh_phan = item_row.get('Thanh_phan', None)
                     if thanh_phan and isinstance(thanh_phan, list) and len(thanh_phan) > 0:
                         st.markdown("**🔗 Các linh kiện/vật tư thành phần trong bộ:**")
@@ -232,6 +238,9 @@ with main_col:
         def_dv = active_data.get("Don_vi", "Bộ") if active_data and active_data.get("Don_vi") in ["Bộ", "Hộp", "Combo"] else "Bộ"
         def_img = active_data.get("Hinh_anh", "") if active_data and active_data.get("Hinh_anh") else ""
         def_tp = active_data.get("Thanh_phan", []) if active_data else []
+        def_gianhap = float(active_data.get("Gia_nhap", 0)) if active_data and active_data.get("Gia_nhap") else 0.0
+        def_giaxuat = float(active_data.get("Gia_xuat", 0)) if active_data and active_data.get("Gia_xuat") else 0.0
+        def_barcode = active_data.get("Barcode", "") if active_data and active_data.get("Barcode") else ""
         st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
         c1, c2 = st.columns(2)
         with c1:
@@ -248,9 +257,12 @@ with main_col:
             else:
                 ma_lk = st.text_input("Mã Combo (Cá nhân tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val")
             so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
+            barcode = st.text_input("Mã vạch (Barcode)", value=def_barcode, placeholder="Quét hoặc nhập mã vạch...", key="cb_barcode_input")
         with c2:
             don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input")
             loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="cb_op_input")
+            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0.0, step=1000.0, value=def_gianhap, key="cb_gianhap_input")
+            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0.0, step=1000.0, value=def_giaxuat, key="cb_giaxuat_input")
             hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img, key="cb_img_input")
         if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
             existing_cb_row = df[df["Ma_LK"] == ma_lk].iloc[0]
@@ -357,7 +369,10 @@ with main_col:
                         "Don_vi": don_vi,
                         "Nhat_ky": nhat_ky_str,
                         "Hinh_anh": hinh_anh,
-                        "Thanh_phan": danh_sach_thanh_phan
+                        "Thanh_phan": danh_sach_thanh_phan,
+                        "Gia_nhap": float(gia_nhap),
+                        "Gia_xuat": float(gia_xuat),
+                        "Barcode": barcode.strip()
                     }
                     supabase.table("Ton_kho").upsert(new_data).execute()
                     st.session_state.edit_combo_data = None
@@ -393,12 +408,18 @@ with main_col:
                 st.session_state.le_ma_input_val = row_data.get("Ma_LK", "")
                 st.session_state.le_dv_input_val = row_data.get("Don_vi", "Cái")
                 st.session_state.le_img_input_val = row_data.get("Hinh_anh", "")
+                st.session_state.le_gianhap_val = float(row_data.get("Gia_nhap", 0)) if row_data.get("Gia_nhap") else 0.0
+                st.session_state.le_giaxuat_val = float(row_data.get("Gia_xuat", 0)) if row_data.get("Gia_xuat") else 0.0
+                st.session_state.le_barcode_val = row_data.get("Barcode", "") if row_data.get("Barcode") else ""
                 st.session_state.single_item_method_radio = "✍️ Tự viết"
             else:
                 st.session_state.le_ten_input_val = ""
                 st.session_state.le_ma_input_val = ""
                 st.session_state.le_dv_input_val = "Cái"
                 st.session_state.le_img_input_val = ""
+                st.session_state.le_gianhap_val = 0.0
+                st.session_state.le_giaxuat_val = 0.0
+                st.session_state.le_barcode_val = ""
                 st.session_state.single_item_method_radio = "🤖 Tự sinh"
         selected_existing = st.selectbox(
             "🔍 Chọn mã linh kiện/vật tư có sẵn (hoặc chọn 'Tạo mới')", 
@@ -414,6 +435,12 @@ with main_col:
             st.session_state.le_dv_input_val = "Cái"
         if "le_img_input_val" not in st.session_state:
             st.session_state.le_img_input_val = ""
+        if "le_gianhap_val" not in st.session_state:
+            st.session_state.le_gianhap_val = 0.0
+        if "le_giaxuat_val" not in st.session_state:
+            st.session_state.le_giaxuat_val = 0.0
+        if "le_barcode_val" not in st.session_state:
+            st.session_state.le_barcode_val = ""
         if "single_item_method_radio" not in st.session_state:
             st.session_state.single_item_method_radio = "🤖 Tự sinh"
         c1, c2 = st.columns(2)
@@ -451,12 +478,15 @@ with main_col:
                 ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=manual_default, key="le_code_manual_show")
                 st.session_state.le_ma_input_val = ma_lk
             so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0, key="le_sl_input")
+            barcode = st.text_input("Mã vạch (Barcode)", value=st.session_state.le_barcode_val, placeholder="Quét hoặc nhập mã vạch...", key="le_barcode_widget")
         with c2:
             dv_list_le = ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét", "Bộ"]
             current_dv = st.session_state.le_dv_input_val
             dv_idx = dv_list_le.index(current_dv) if current_dv in dv_list_le else 0
             don_vi = st.selectbox("Đơn vị tính", dv_list_le, index=dv_idx, key="le_dv_input")
             loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="le_op_input")
+            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0.0, step=1000.0, value=st.session_state.le_gianhap_val, key="le_gianhap_widget")
+            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0.0, step=1000.0, value=st.session_state.le_giaxuat_val, key="le_giaxuat_widget")
             hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=st.session_state.le_img_input_val, key="le_img_input")
         if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
             dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
@@ -487,7 +517,10 @@ with main_col:
                         "Don_vi": don_vi,
                         "Nhat_ky": nhat_ky_str,
                         "Hinh_anh": hinh_anh,
-                        "Thanh_phan": old_tp
+                        "Thanh_phan": old_tp,
+                        "Gia_nhap": float(gia_nhap),
+                        "Gia_xuat": float(gia_xuat),
+                        "Barcode": barcode.strip()
                     }
                     supabase.table("Ton_kho").upsert(new_data).execute()
                     st.success("Đã lưu linh kiện/vật tư lẻ thành công vào Database!")
