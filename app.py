@@ -383,18 +383,24 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
-        st.info("💡 Bạn có thể **chọn mã có sẵn từ danh sách** để hệ thống tự điền tên, hoặc **gõ tên sản phẩm mới** để hệ thống tự động sinh mã theo tùy chọn.")
+        st.info("💡 Bạn có thể **chọn mã linh kiện/vật tư có sẵn từ danh sách** để tự điền dữ liệu cũ, hoặc **gõ tên mới** để hệ thống tự sinh mã.")
+        # Lọc danh sách: Chỉ lấy sản phẩm LẺ (bắt đầu bằng LK hoặc VT), tuyệt đối không hiển thị mã Combo (CB)
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
-            for _, r in df.iterrows():
+            # Lọc các mã không phải Combo (CB/CM)
+            df_le = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
+            for _, r in df_le.iterrows():
                 display_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
                 existing_items.append(display_str)
                 item_dict[display_str] = r.to_dict()
-        selected_existing = st.selectbox("🔍 Chọn mã linh kiện/vật tư có sẵn (hoặc chọn 'Tạo mới')", existing_items)
-        # Khởi tạo giá trị mặc định khi chọn từ danh sách có sẵn
-        def_ma = ""
+        selected_existing = st.selectbox(
+            "🔍 Chọn mã linh kiện/vật tư có sẵn (hoặc chọn 'Tạo mới')", 
+            existing_items,
+            key="le_select_box"
+        )
         def_ten = ""
+        def_ma = ""
         def_dv = "Cái"
         def_img = ""
         if selected_existing != "-- Tạo mới / Nhập mới hoàn toàn --":
@@ -403,11 +409,15 @@ with main_col:
             def_ten = matched_row.get("Ten_LK", "")
             def_dv = matched_row.get("Don_vi", "Cái")
             def_img = matched_row.get("Hinh_anh", "")
-        # Form nhập liệu không dùng st.form để mã tự động nhảy mượt mà khi gõ tên
         c1, c2 = st.columns(2)
         with c1:
-            ten_lk = st.text_input("Tên linh kiện / vật tư", value=def_ten, placeholder="VD: Bulong 8.8 mạ nhúng nóng M16x50")
-            # Thêm lựa chọn Phân loại (VT / LK) và Phương thức mã ngay dưới tên
+            # Cho phép tự do nhập tên linh kiện / vật tư
+            ten_lk = st.text_input(
+                "Tên linh kiện / vật tư", 
+                value=def_ten if selected_existing != "-- Tạo mới / Nhập mới hoàn toàn --" else None, 
+                key="le_ten_input", 
+                placeholder="VD: Bulong 8.8 mạ nhúng nóng M16x50"
+            )
             sub_col_type, sub_col_method = st.columns(2)
             with sub_col_type:
                 item_cat_le = st.radio(
@@ -424,22 +434,23 @@ with main_col:
                     key="single_item_method_radio"
                 )
             prefix_type_le = "LK" if "LK" in item_cat_le else "VT"
+            # Tự động tính toán mã theo tên đã gõ
             auto_code_le = generate_code_from_name(ten_lk, is_combo=False, item_type=prefix_type_le)
             if item_method_le.startswith("🤖"):
-                ma_lk = st.text_input("Mã LK / VT (Tự động sinh)", value=auto_code_le, key="single_item_code_auto")
+                ma_lk = st.text_input("Mã LK / VT (Tự động sinh)", value=auto_code_le if auto_code_le else def_ma, key="le_code_auto_show")
             else:
-                ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=def_ma if def_ma else auto_code_le, key="single_item_code_manual")
-            so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0)
+                ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=def_ma if def_ma else auto_code_le, key="le_code_manual_show")
+            so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0, key="le_sl_input")
         with c2:
-            dv_list_le = ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"]
+            dv_list_le = ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét", "Bộ"]
             dv_idx = dv_list_le.index(def_dv) if def_dv in dv_list_le else 0
-            don_vi = st.selectbox("Đơn vị tính", dv_list_le, index=dv_idx)
-            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
-            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
+            don_vi = st.selectbox("Đơn vị tính", dv_list_le, index=dv_idx, key="le_dv_input")
+            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="le_op_input")
+            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img, key="le_img_input")
         if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
             dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
             st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']}).")
-        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới")
+        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới", key="le_note_input")
         st.markdown("")
         if st.button("💾 Lưu Linh kiện/Vật tư lẻ vào Database", type="primary", use_container_width=True):
             if ma_lk and ten_lk:
@@ -557,7 +568,7 @@ with main_col:
                                 st.success("Xé lẻ Combo thành công! Đã trừ số lượng bộ Combo và tự động cộng bù linh kiện con vào kho lẻ.")
                                 st.rerun()
                             except Exception as e:
-                                st.error(f"Lỗi khi thực hiện xé lẻ: {e}")
+                                st.error(f"Lỗi khi thực hiện xuất kho: {e}")
                 else:
                     st.info("Bộ Combo này chưa khai báo định mức linh kiện thành phần ở Phần 2.")
             else:
