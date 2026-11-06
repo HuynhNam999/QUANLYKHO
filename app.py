@@ -232,25 +232,26 @@ with main_col:
         def_img = active_data.get("Hinh_anh", "") if active_data and active_data.get("Hinh_anh") else ""
         def_tp = active_data.get("Thanh_phan", []) if active_data else []
         st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
-        # 1. Nút chọn chế độ tạo mã cho phần 1 (Combo)
-        cb_ma_choice = st.radio(
-            "Chọn phương thức tạo Mã Combo:",
-            ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
-            horizontal=True,
-            key="cb_method_radio"
-        )
         c1, c2 = st.columns(2)
         with c1:
-            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ phụ tùng sửa chữa máy")
+            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn gỗ lim")
+            # Sinh mã tự động dựa theo tên
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
-            # Hai ô hiển thị tương ứng với nút chọn phía trên
-            col_m1, col_m2 = st.columns(2)
-            with col_m1:
-                st.text_input("Mã tự động sinh", value=auto_cb_code, disabled=True, key="cb_auto_display")
-            with col_m2:
-                manual_cb_code = st.text_input("Mã tự cá nhân viết", value=def_ma if def_ma else auto_cb_code, key="cb_manual_input")
-            # Lấy mã thực tế dựa vào lựa chọn của người dùng
-            ma_lk = auto_cb_code if cb_ma_choice.startswith("🤖") else manual_cb_code
+            # Nút chọn chế độ mã ngay trên đầu ô mã duy nhất
+            cb_ma_mode = st.radio(
+                "Phương thức mã Combo:",
+                ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
+                horizontal=True,
+                key="cb_ma_mode_radio"
+            )
+            # Khởi tạo session state cho mã thủ công nếu chưa có
+            if "cb_manual_val" not in st.session_state:
+                st.session_state.cb_manual_val = def_ma if def_ma else auto_cb_code
+            # Nếu chọn tự động thì hiển thị mã tự động, nếu chọn thủ công thì mở ô cho tự viết
+            if cb_ma_mode.startswith("🤖"):
+                ma_lk = st.text_input("Mã Combo", value=auto_cb_code, disabled=True, key="cb_code_display_auto")
+            else:
+                ma_lk = st.text_input("Mã Combo (Tự viết)", value=st.session_state.cb_manual_val, key="cb_code_display_manual")
             so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
         with c2:
             don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input")
@@ -261,7 +262,7 @@ with main_col:
             st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (Tên: *{existing_cb_row['Ten_LK']}*, Tồn: *{existing_cb_row['So_luong']}*).")
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo", key="cb_note_input")
         st.markdown("---")
-        st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN (Chọn phương thức tự động sinh hoặc tự viết mã)")
+        st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN")
         def get_tp_val(idx, field):
             if idx < len(def_tp) and isinstance(def_tp, list):
                 val = def_tp[idx].get(field, "")
@@ -271,20 +272,13 @@ with main_col:
         generated_codes_in_form = []
         for i in range(1, 11):
             st.markdown(f"**Thành phần {i}**")
-            # Nút chọn phương thức tạo mã cho từng thành phần con
-            tp_ma_choice = st.radio(
-                f"Phương thức mã cho Thành phần {i}:",
-                ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
-                horizontal=True,
-                key=f"tp{i}_method_radio"
-            )
             sub_c1, sub_c2 = st.columns([3, 1])
             with sub_c1:
                 t_name = st.text_input(
                     f"Tên đầy đủ linh kiện/vật tư {i}", 
                     value=str(get_tp_val(i-1, 'ten')), 
                     key=f"live_tp{i}_ten", 
-                    placeholder="VD: Bulong 10.9 mạ dacromet M24x115"
+                    placeholder="VD: Bulong 4.6 mạ nhúng nóng M12x40"
                 )
             with sub_c2:
                 t_sl = st.number_input(
@@ -295,16 +289,22 @@ with main_col:
                 )
             auto_generated_code = generate_code_from_name(t_name, is_combo=False)
             old_saved_code = get_tp_val(i-1, 'ma')
-            # Hai ô hiển thị song song: Ô mã tự động và Ô mã cá nhân tự viết
-            sub_c3, sub_c4, sub_c5 = st.columns([2, 2, 1])
+            # Nút chọn phương thức mã cho từng thành phần con
+            tp_ma_choice = st.radio(
+                f"Phương thức mã cho Thành phần {i}:",
+                ["🤖 Hệ thống tự sinh mã", "✍️ Cá nhân tự viết mã"],
+                horizontal=True,
+                key=f"tp{i}_method_radio"
+            )
+            sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
-                st.text_input(f"Mã tự động sinh {i}", value=auto_generated_code, disabled=True, key=f"live_tp{i}_code_auto")
+                if tp_ma_choice.startswith("🤖"):
+                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i}", value=auto_generated_code, disabled=True, key=f"live_tp{i}_code_auto")
+                    final_tp_code = auto_generated_code
+                else:
+                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Tự viết)", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual")
             with sub_c4:
-                manual_tp_code = st.text_input(f"Mã cá nhân viết {i}", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual")
-            with sub_c5:
-                t_img = st.text_input(f"Ảnh URL {i}", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i")
-            # Quyết định chọn mã nào để lưu
-            final_tp_code = auto_generated_code if tp_ma_choice.startswith("🤖") else manual_tp_code
+                t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i")
             if final_tp_code:
                 if final_tp_code in generated_codes_in_form:
                     st.error(f"⚠️ **Trùng mã nội bộ:** Mã `{final_tp_code}` bị trùng với thành phần bên trên!")
