@@ -191,6 +191,11 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
         st.markdown("---")
+        # Bảng hướng dẫn nguyên tắc tạo mã Combo
+        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ COMBO:**\n"
+                  "- **Cấu trúc mã chuẩn:** `CB-[Tên_Sản_Phẩm]`\n"
+                  "- **Ví dụ:** Combo tên *'Bộ bàn gỗ lim'* ➡️ Hệ thống tự sinh mã: `CB-BO_BAN_GO_LIM`\n"
+                  "- ⚠️ **Lưu ý:** Nếu mã trùng với hệ thống, màn hình sẽ hiển thị **cảnh báo đỏ** để bạn kiểm tra lại.")
         che_do_nhap = st.radio(
             "⚙️ Chọn phương thức khai báo Combo:",
             ["➕ Nhập mới hoàn toàn", "🔄 Lấy theo dữ liệu Combo cũ để chỉnh sửa (thêm/bớt thành phần)"],
@@ -239,9 +244,9 @@ with main_col:
                 key="cb_ma_mode_radio"
             )
             if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo (Bắt đầu bằng CB)", value=auto_cb_code, key="cb_code_auto_val")
+                ma_lk = st.text_input("Mã Combo (Tự động sinh)", value=auto_cb_code, key="cb_code_auto_val")
             else:
-                ma_lk = st.text_input("Mã Combo (Tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val")
+                ma_lk = st.text_input("Mã Combo (Cá nhân tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val")
             so_luong = st.number_input("Số lượng bộ", min_value=0, step=1, value=0, key="cb_sl_input")
         with c2:
             don_vi = st.selectbox("Đơn vị tính", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input")
@@ -366,7 +371,11 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
-        st.info("💡 Bạn có thể **chọn mã linh kiện/vật tư có sẵn từ danh sách** để tự điền dữ liệu cũ, hoặc **gõ tên mới** để hệ thống tự sinh mã trực quan.")
+        # Bảng hướng dẫn nguyên tắc tạo mã Linh kiện / Vật tư lẻ
+        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ LINH KIỆN / VẬT TƯ:**\n"
+                  "- **Cấu trúc mã chuẩn:** `VT-[Tên_Sản_Phẩm]` (vật tư) hoặc `LK-[Tên_Sản_Phẩm]` (linh kiện)\n"
+                  "- **Ví dụ:** Vật tư tên *'Bulong mạ dacromet M24x85'* ➡️ Tự sinh mã: `VT-BULONG_MA_DACROMET_M24X85`\n"
+                  "- ⚠️ **Lưu ý:** Nếu mã trùng với dữ liệu cũ trong kho, màn hình sẽ hiển thị **cảnh báo đỏ** ngay lập tức.")
         # Lọc danh sách: Chỉ lấy sản phẩm LẺ (bắt đầu bằng LK hoặc VT), loại bỏ hoàn toàn Combo (CB)
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
@@ -386,7 +395,6 @@ with main_col:
                 st.session_state.le_ma_input_val = row_data.get("Ma_LK", "")
                 st.session_state.le_dv_input_val = row_data.get("Don_vi", "Cái")
                 st.session_state.le_img_input_val = row_data.get("Hinh_anh", "")
-                # Khi chọn item cũ, tự động chuyển phương thức mã sang "Tự viết" để hiển thị đúng mã cũ
                 st.session_state.single_item_method_radio = "✍️ Tự viết"
             else:
                 st.session_state.le_ten_input_val = ""
@@ -436,10 +444,8 @@ with main_col:
                 )
             prefix_type_le = "LK" if "LK" in item_cat_le else "VT"
             auto_code_le = generate_code_from_name(st.session_state.le_ten_input_val, is_combo=False, item_type=prefix_type_le)
-            # Nếu chọn "Tự sinh": hiển thị mã tự động tính toán theo tên
-            # Nếu chọn "Tự viết": hiển thị mã cá nhân tự viết hoặc cho phép chỉnh sửa
             if item_method_le.startswith("🤖"):
-                ma_lk = st.text_input("Mã LK / VT (Tự động sinh rõ nghĩa)", value=auto_code_le, key="le_code_auto_show")
+                ma_lk = st.text_input("Mã LK / VT (Tự động sinh)", value=auto_code_le, key="le_code_auto_show")
             else:
                 manual_default = st.session_state.le_ma_input_val if st.session_state.le_ma_input_val else auto_code_le
                 ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=manual_default, key="le_code_manual_show")
