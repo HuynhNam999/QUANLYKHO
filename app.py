@@ -33,7 +33,7 @@ def remove_vietnamese_accent(text):
     text = re.sub(r'[\u0300-\u036f]', '', text)
     text = text.replace('đ', 'd').replace('Đ', 'D')
     return text
-# Hàm tự động sinh mã thông minh, giữ lại dấu chấm cho số kỹ thuật và tối ưu kích thước dài rộng cao
+# Hàm tự động sinh mã thông minh
 def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     if not full_name or not full_name.strip():
         return ""
@@ -125,7 +125,7 @@ with main_col:
             st.dataframe(styled_df, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm linh kiện mới ở mục bên trái!")
-    # 2. TRA CỨU & LỌC CHI TIẾT (Tích hợp quét Barcode tìm kiếm nhanh)
+    # 2. TRA CỨU & LỌC CHI TIẾT
     elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
         st.title("🔍 TRA CỨU & LỌC CHI TIẾT SẢN PHẨM")
         st.markdown("---")
@@ -133,7 +133,6 @@ with main_col:
             col_sc1, col_sc2 = st.columns([2, 2])
             with col_sc1:
                 barcode_search = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để tra cứu nhanh", placeholder="Nhấn vào đây rồi quét mã vạch...")
-            # Nếu người dùng quét Barcode, tự động lọc ra mã linh kiện tương ứng
             target_ma_lk = None
             if barcode_search.strip():
                 matched_bc = df[df["Barcode"].str.contains(barcode_search.strip(), case=False, na=False)]
@@ -208,18 +207,16 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. NHẬP MỚI COMBO
+    # 3. NHẬP MỚI COMBO (Đã khắc phục lỗi tải dữ liệu cũ hiển thị lên form)
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI / CHỈNH SỬA COMBO SẢN PHẨM")
+        script_run_timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f") # Ép state làm mới
         st.markdown("---")
-        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ COMBO:**\n"
-                  "- **Cấu trúc mã chuẩn:** `CB-[Tên_Viết_Tắt]`\n"
-                  "- **Ví dụ:** Combo tên *'Bộ bàn gỗ lim 1.2M'* ➡️ Hệ thống tự sinh mã: `CB-BO_BAN_GO_LIM_1.2M`\n"
-                  "- ⚠️ **Lưu ý:** Thiết lập quy cách đóng gói kiện/lẻ để quản lý linh hoạt lượng nhập xuất.")
         che_do_nhap = st.radio(
             "⚙️ Chọn phương thức khai báo Combo:",
             ["➕ Nhập mới hoàn toàn", "🔄 Lấy theo dữ liệu Combo cũ để chỉnh sửa (thêm/bớt thành phần)"],
-            horizontal=True
+            horizontal=True,
+            key=f"che_do_nhap_radio_{script_run_timestamp}"
         )
         combo_dict = {}
         if not df.empty:
@@ -233,7 +230,7 @@ with main_col:
             if combo_dict:
                 col_sel1, col_sel2 = st.columns([3, 1])
                 with col_sel1:
-                    chosen_cb_str = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", list(combo_dict.keys()), key="select_combo_box")
+                    chosen_cb_str = st.selectbox("📂 Chọn mã Combo cũ cần tải dữ liệu:", list(combo_dict.keys()), key="select_combo_box_fix")
                 with col_sel2:
                     st.write("")
                     st.write("")
@@ -259,35 +256,35 @@ with main_col:
         st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
         c1, c2 = st.columns(2)
         with c1:
-            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn gỗ lim 1.2M")
+            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input_fix", placeholder="VD: Bộ bàn gỗ lim 1.2M")
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
             cb_ma_mode = st.radio(
                 "Phương thức mã Combo:",
                 ["🤖 Tự sinh", "✍️ Tự viết"],
                 horizontal=True,
-                key="cb_ma_mode_radio"
+                key="cb_ma_mode_radio_fix"
             )
             if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo (Mã tự động từ hệ thống)", value=auto_cb_code, key="cb_code_auto_val")
+                ma_lk = st.text_input("Mã Combo (Mã tự động từ hệ thống)", value=auto_cb_code, key="cb_code_auto_val_fix")
             else:
-                ma_lk = st.text_input("Mã Combo (Cá nhân tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val")
-            don_vi_nhap = st.selectbox("Đơn vị giao dịch khi nhập", ["Đơn vị lẻ (Cái/Bộ)", "📦 Kiện (Đóng thùng)"], key="cb_dv_nhap")
-            so_luong_nhap = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="cb_sl_input")
-            quy_cach = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach, key="cb_quycach_input")
+                ma_lk = st.text_input("Mã Combo (Cá nhân tự viết)", value=def_ma if def_ma else auto_cb_code, key="cb_code_manual_val_fix")
+            don_vi_nhap = st.selectbox("Đơn vị giao dịch khi nhập", ["Đơn vị lẻ (Cái/Bộ)", "📦 Kiện (Đóng thùng)"], key="cb_dv_nhap_fix")
+            so_luong_nhap = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="cb_sl_input_fix")
+            quy_cach = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=def_quycach, key="cb_quycach_input_fix")
             so_luong_thuc_te = so_luong_nhap * quy_cach if don_vi_nhap.startswith("📦") else so_luong_nhap
-            barcode = st.text_input("Mã vạch (Barcode)", value=def_barcode, placeholder="Quét hoặc nhập mã vạch...", key="cb_barcode_input")
+            barcode = st.text_input("Mã vạch (Barcode)", value=def_barcode, placeholder="Quét hoặc nhập mã vạch...", key="cb_barcode_input_fix")
         with c2:
-            don_vi = st.selectbox("Đơn vị tính cơ bản", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input")
-            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="cb_op_input")
-            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0.0, step=1000.0, value=def_gianhap, key="cb_gianhap_input")
-            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0.0, step=1000.0, value=def_giaxuat, key="cb_giaxuat_input")
-            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img, key="cb_img_input")
+            don_vi = st.selectbox("Đơn vị tính cơ bản", ["Bộ", "Hộp", "Combo"], index=["Bộ", "Hộp", "Combo"].index(def_dv) if def_dv in ["Bộ", "Hộp", "Combo"] else 0, key="cb_dv_input_fix")
+            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="cb_op_input_fix")
+            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0.0, step=1000.0, value=def_gianhap, key="cb_gianhap_input_fix")
+            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0.0, step=1000.0, value=def_giaxuat, key="cb_giaxuat_input_fix")
+            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img, key="cb_img_input_fix")
         if don_vi_nhap.startswith("📦") and so_luong_nhap > 0:
             st.info(f"💡 Quy đổi hệ thống: **{so_luong_nhap} Kiện** x {quy_cach} = **{so_luong_thuc_te} {don_vi}** sẽ được cộng vào kho.")
-        if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
+        if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values and not che_do_nhap.startswith("🔄"):
             existing_cb_row = df[df["Ma_LK"] == ma_lk].iloc[0]
             st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (Tên: *{existing_cb_row['Ten_LK']}*, Tồn: *{existing_cb_row['So_luong']}*).")
-        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo", key="cb_note_input")
+        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Cập nhật thêm/bớt linh kiện thành phần combo", key="cb_note_input_fix")
         st.markdown("---")
         st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN")
         def get_tp_val(idx, field):
@@ -304,7 +301,7 @@ with main_col:
                 t_name = st.text_input(
                     f"Tên đầy đủ linh kiện/vật tư {i}", 
                     value=str(get_tp_val(i-1, 'ten')), 
-                    key=f"live_tp{i}_ten", 
+                    key=f"live_tp{i}_ten_fix", 
                     placeholder="VD: Bulong 10.9 mạ dacromet M24x90"
                 )
             with sub_c2:
@@ -312,7 +309,7 @@ with main_col:
                     f"Định mức {i}", 
                     min_value=1, 
                     value=int(get_tp_val(i-1, 'sl')) if str(get_tp_val(i-1, 'sl')).isdigit() else 1, 
-                    key=f"live_tp{i}_s"
+                    key=f"live_tp{i}_s_fix"
                 )
             with sub_c_dv:
                 old_dv_val = get_tp_val(i-1, 'dv')
@@ -322,7 +319,7 @@ with main_col:
                     f"Đơn vị tính {i}",
                     dv_list,
                     index=dv_idx,
-                    key=f"live_tp{i}_dv"
+                    key=f"live_tp{i}_dv_fix"
                 )
             sub_type_col1, sub_type_col2 = st.columns(2)
             with sub_type_col1:
@@ -330,14 +327,14 @@ with main_col:
                     f"Phân loại thành phần {i}:",
                     ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"],
                     horizontal=True,
-                    key=f"tp{i}_cat_radio"
+                    key=f"tp{i}_cat_radio_fix"
                 )
             with sub_type_col2:
                 tp_ma_choice = st.radio(
                     f"Phương thức mã cho Thành phần {i}:",
                     ["🤖 Tự sinh", "✍️ Tự viết"],
                     horizontal=True,
-                    key=f"tp{i}_method_radio"
+                    key=f"tp{i}_method_radio_fix"
                 )
             prefix_type = "LK" if "LK" in item_cat else "VT"
             auto_generated_code = generate_code_from_name(t_name, is_combo=False, item_type=prefix_type)
@@ -345,11 +342,11 @@ with main_col:
             sub_c3, sub_c4 = st.columns([3, 1])
             with sub_c3:
                 if tp_ma_choice.startswith("🤖"):
-                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Mã tự động từ hệ thống)", value=auto_generated_code, key=f"live_tp{i}_code_auto_val")
+                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Mã tự động từ hệ thống)", value=auto_generated_code, key=f"live_tp{i}_code_auto_val_fix")
                 else:
-                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Tự viết)", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual_val")
+                    final_tp_code = st.text_input(f"Mã linh kiện/vật tư {i} (Tự viết)", value=old_saved_code if old_saved_code else auto_generated_code, key=f"live_tp{i}_code_manual_val_fix")
             with sub_c4:
-                t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i")
+                t_img = st.text_input(f"Link ảnh LK/VT {i} (URL)", value=str(get_tp_val(i-1, 'img')), key=f"live_tp{i}_i_fix")
             if final_tp_code:
                 if final_tp_code in generated_codes_in_form:
                     st.error(f"⚠️ **Trùng mã nội bộ:** Mã `{final_tp_code}` bị trùng với thành phần bên trên!")
@@ -408,10 +405,6 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
-        st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ LINH KIỆN / VẬT TƯ:**\n"
-                  "- **Cấu trúc mã chuẩn:** `VT-[Tên_Viết_Tắt]` hoặc `LK-[Tên_Viết_Tắt]`\n"
-                  "- **Ví dụ:** Vật tư tên *'Bulong 10.9 mạ dacromet M24x90'* ➡️ Tự sinh mã: `VT-BL_10.9_MA_DACROMET_M24X90`\n"
-                  "- ⚠️ **Lưu ý:** Thiết lập quy cách đóng gói (1 Kiện = ? Cái) để hệ thống tự động quy đổi khi nhập xuất.")
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
@@ -652,7 +645,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 6. XUẤT KHO COMBO (Tích hợp quét Barcode xuất nhanh)
+    # 6. XUẤT KHO COMBO
     elif menu_choice == "📤 Xuất kho Combo":
         st.title("📤 XUẤT KHO COMBO (Tự động trừ định mức linh kiện/vật tư con)")
         st.markdown("---")
@@ -754,7 +747,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 7. XUẤT KHO LINH KIỆN LẺ (Tích hợp quét Barcode xuất nhanh)
+    # 7. XUẤT KHO LINH KIỆN LẺ
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
         st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập & Thành phần)")
         st.markdown("---")
