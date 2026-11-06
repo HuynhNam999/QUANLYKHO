@@ -33,14 +33,13 @@ def remove_vietnamese_accent(text):
     text = re.sub(r'[\u0300-\u036f]', '', text)
     text = text.replace('đ', 'd').replace('Đ', 'D')
     return text
-# Hàm tự động sinh mã thông minh
+# Hàm tự động sinh mã thông minh chuẩn CB, LK, VT
 def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     if not full_name or not full_name.strip():
         return ""
     clean_no_accent = remove_vietnamese_accent(full_name.strip())
     upper_name = clean_no_accent.upper()
     if is_combo:
-        # Lấy các ký tự chữ và số
         words = upper_name.split()
         if len(words) >= 2:
             code_part = "".join([w[0] for w in words if w.isalnum()])[:8]
@@ -384,74 +383,97 @@ with main_col:
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
-        st.info("💡 Bạn có thể **chọn mã có sẵn từ danh sách** để hệ thống tự điền tên và cập nhật, hoặc **gõ tên sản phẩm mới** để hệ thống tự sinh mã.")
+        st.info("💡 Bạn có thể **chọn mã có sẵn từ danh sách** để hệ thống tự điền tên, hoặc **gõ tên sản phẩm mới** để hệ thống tự động sinh mã theo tùy chọn.")
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
             for _, r in df.iterrows():
                 display_str = f"{r['Ma_LK']} - {r['Ten_LK']}"
                 existing_items.append(display_str)
-                item_dict[display_str] = r
+                item_dict[display_str] = r.to_dict()
         selected_existing = st.selectbox("🔍 Chọn mã linh kiện/vật tư có sẵn (hoặc chọn 'Tạo mới')", existing_items)
+        # Khởi tạo giá trị mặc định khi chọn từ danh sách có sẵn
         def_ma = ""
         def_ten = ""
         def_dv = "Cái"
         def_img = ""
         if selected_existing != "-- Tạo mới / Nhập mới hoàn toàn --":
             matched_row = item_dict[selected_existing]
-            def_ma = matched_row["Ma_LK"]
-            def_ten = matched_row["Ten_LK"]
-            def_dv = matched_row["Don_vi"] if matched_row["Don_vi"] in ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"] else "Cái"
-            def_img = matched_row["Hinh_anh"] if matched_row["Hinh_anh"] else ""
-        with st.form("add_item_form", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                ten_lk = st.text_input("Tên linh kiện / vật tư", value=def_ten, placeholder="VD: Tán 10.9 M16")
-                preview_code = generate_code_from_name(ten_lk, is_combo=False) if not def_ma else def_ma
-                ma_lk = st.text_input("Mã LK / VT (Tự động sinh hoặc chỉnh sửa)", value=preview_code)
-                so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0)
-            with c2:
-                don_vi = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"], index=["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"].index(def_dv) if def_dv in ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"] else 0)
-                loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
-                hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
-            if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
-                dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']}).")
-            ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới")
-            save_btn = st.form_submit_button("💾 Lưu Linh kiện/Vật tư lẻ vào Database")
-            if save_btn:
-                if ma_lk and ten_lk:
-                    try:
-                        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
-                        nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                        nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
-                        if ghi_chu_tay:
-                            nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
-                        old_tp = []
-                        if not df.empty and ma_lk in df["Ma_LK"].values:
-                            old_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-                            old_tp = old_row.get("Thanh_phan", [])
-                            if loai_gd == "📥 Nhập kho mới":
-                                so_luong = int(old_row["So_luong"]) + int(so_luong)
-                            old_logs = old_row.get("Nhat_ky", "")
-                            if old_logs:
-                                nhat_ky_str = old_logs + "\n" + nhat_ky_str
-                        new_data = {
-                            "Ma_LK": ma_lk,
-                            "Ten_LK": ten_lk,
-                            "So_luong": int(so_luong),
-                            "Don_vi": don_vi,
-                            "Nhat_ky": nhat_ky_str,
-                            "Hinh_anh": hinh_anh,
-                            "Thanh_phan": old_tp
-                        }
-                        supabase.table("Ton_kho").upsert(new_data).execute()
-                        st.success("Đã lưu linh kiện/vật tư lẻ thành công vào Database!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Lỗi khi lưu dữ liệu: {e}")
-                else:
-                    st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện/vật tư!")
+            def_ma = matched_row.get("Ma_LK", "")
+            def_ten = matched_row.get("Ten_LK", "")
+            def_dv = matched_row.get("Don_vi", "Cái")
+            def_img = matched_row.get("Hinh_anh", "")
+        # Form nhập liệu không dùng st.form để mã tự động nhảy mượt mà khi gõ tên
+        c1, c2 = st.columns(2)
+        with c1:
+            ten_lk = st.text_input("Tên linh kiện / vật tư", value=def_ten, placeholder="VD: Bulong 8.8 mạ nhúng nóng M16x50")
+            # Thêm lựa chọn Phân loại (VT / LK) và Phương thức mã ngay dưới tên
+            sub_col_type, sub_col_method = st.columns(2)
+            with sub_col_type:
+                item_cat_le = st.radio(
+                    "Phân loại:",
+                    ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"],
+                    horizontal=True,
+                    key="single_item_cat_radio"
+                )
+            with sub_col_method:
+                item_method_le = st.radio(
+                    "Phương thức mã:",
+                    ["🤖 Tự sinh", "✍️ Tự viết"],
+                    horizontal=True,
+                    key="single_item_method_radio"
+                )
+            prefix_type_le = "LK" if "LK" in item_cat_le else "VT"
+            auto_code_le = generate_code_from_name(ten_lk, is_combo=False, item_type=prefix_type_le)
+            if item_method_le.startswith("🤖"):
+                ma_lk = st.text_input("Mã LK / VT (Tự động sinh)", value=auto_code_le, key="single_item_code_auto")
+            else:
+                ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=def_ma if def_ma else auto_code_le, key="single_item_code_manual")
+            so_luong = st.number_input("Số lượng nhập thêm / tồn kho", min_value=0, step=1, value=0)
+        with c2:
+            dv_list_le = ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét"]
+            dv_idx = dv_list_le.index(def_dv) if def_dv in dv_list_le else 0
+            don_vi = st.selectbox("Đơn vị tính", dv_list_le, index=dv_idx)
+            loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"])
+            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=def_img)
+        if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
+            dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']}).")
+        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới")
+        st.markdown("")
+        if st.button("💾 Lưu Linh kiện/Vật tư lẻ vào Database", type="primary", use_container_width=True):
+            if ma_lk and ten_lk:
+                try:
+                    ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - {loai_gd}: {so_luong} {don_vi}"
+                    if ghi_chu_tay:
+                        nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
+                    old_tp = []
+                    if not df.empty and ma_lk in df["Ma_LK"].values:
+                        old_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+                        old_tp = old_row.get("Thanh_phan", [])
+                        if loai_gd == "📥 Nhập kho mới":
+                            so_luong = int(old_row["So_luong"]) + int(so_luong)
+                        old_logs = old_row.get("Nhat_ky", "")
+                        if old_logs:
+                            nhat_ky_str = old_logs + "\n" + nhat_ky_str
+                    new_data = {
+                        "Ma_LK": ma_lk,
+                        "Ten_LK": ten_lk,
+                        "So_luong": int(so_luong),
+                        "Don_vi": don_vi,
+                        "Nhat_ky": nhat_ky_str,
+                        "Hinh_anh": hinh_anh,
+                        "Thanh_phan": old_tp
+                    }
+                    supabase.table("Ton_kho").upsert(new_data).execute()
+                    st.success("Đã lưu linh kiện/vật tư lẻ thành công vào Database!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Lỗi khi lưu dữ liệu: {e}")
+            else:
+                st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện/vật tư!")
     # 5. XÉ LẺ COMBO THÀNH LINH KIỆN
     elif menu_choice == "🔄 Xé lẻ Combo thành Linh kiện":
         st.title("🔄 XÉ LẺ COMBO THÀNH LINH KIỆN (Kit Breaking)")
