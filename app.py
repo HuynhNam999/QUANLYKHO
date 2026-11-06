@@ -33,25 +33,26 @@ def remove_vietnamese_accent(text):
     text = re.sub(r'[\u0300-\u036f]', '', text)
     text = text.replace('đ', 'd').replace('Đ', 'D')
     return text
-# Hàm tự động sinh mã chuẩn gọn gàng, tối ưu cho kế toán & kho vận
+# Hàm tự động sinh mã thông minh, giữ lại dấu chấm cho số kỹ thuật và tối ưu kích thước dài rộng cao
 def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     if not full_name or not full_name.strip():
         return ""
     clean_no_accent = remove_vietnamese_accent(full_name.strip())
     upper_name = clean_no_accent.upper()
     if is_combo:
-        clean_code = re.sub(r'[^A-Z0-9]', '_', upper_name)
+        clean_code = re.sub(r'[^A-Z0-9\.]', '_', upper_name)
         clean_code = re.sub(r'_+', '_', clean_code).strip('_')
         parts = clean_code.split('_')
         short_str = "_".join(parts[:3]) if len(parts) > 3 else clean_code
-        return f"CB-{short_str[:20]}"
+        return f"CB-{short_str[:25]}"
     prefix = item_type if item_type in ["LK", "VT"] else "VT"
-    # Viết tắt các từ khóa thông dụng để mã gọn gàng
+    # Viết tắt các từ khóa thông dụng để mã gọn gàng nhưng vẫn giữ chi tiết kích thước phía sau
     upper_name = upper_name.replace("BULONG", "BL").replace("BU LONG", "BL")
     upper_name = upper_name.replace("LONG DEN", "LD").replace("LON DEN", "LD")
-    clean_code = re.sub(r'[^A-Z0-9]', '_', upper_name)
+    # Chỉ cho phép chữ cái, số, dấu chấm (.) và dấu gạch, loại bỏ ngoặc đơn và ký tự đặc biệt khác
+    clean_code = re.sub(r'[^A-Z0-9\.]', '_', upper_name)
     clean_code = re.sub(r'_+', '_', clean_code).strip('_')
-    auto_code = f"{prefix}-{clean_code[:22]}"
+    auto_code = f"{prefix}-{clean_code[:30]}"
     return auto_code.replace("__", "_").upper()
 # Quản lý đăng nhập
 if "logged_in" not in st.session_state:
@@ -193,7 +194,7 @@ with main_col:
         st.markdown("---")
         st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ COMBO:**\n"
                   "- **Cấu trúc mã chuẩn:** `CB-[Tên_Viết_Tắt]`\n"
-                  "- **Ví dụ:** Combo tên *'Bộ bàn gỗ lim'* ➡️ Hệ thống tự sinh mã gọn: `CB-BO_BAN_GO_LIM`\n"
+                  "- **Ví dụ:** Combo tên *'Bộ bàn gỗ lim 1.2M'* ➡️ Hệ thống tự sinh mã: `CB-BO_BAN_GO_LIM_1.2M`\n"
                   "- ⚠️ **Lưu ý:** Nếu mã trùng với hệ thống, màn hình sẽ hiển thị **cảnh báo đỏ** để bạn kiểm tra lại.")
         che_do_nhap = st.radio(
             "⚙️ Chọn phương thức khai báo Combo:",
@@ -234,7 +235,7 @@ with main_col:
         st.markdown("### 🏷️ PHẦN 1: THÔNG TIN COMBO")
         c1, c2 = st.columns(2)
         with c1:
-            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn gỗ lim")
+            ten_lk = st.text_input("Tên Combo", value=def_ten, key="cb_ten_input", placeholder="VD: Bộ bàn gỗ lim 1.2M")
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
             cb_ma_mode = st.radio(
                 "Phương thức mã Combo:",
@@ -272,7 +273,7 @@ with main_col:
                     f"Tên đầy đủ linh kiện/vật tư {i}", 
                     value=str(get_tp_val(i-1, 'ten')), 
                     key=f"live_tp{i}_ten", 
-                    placeholder="VD: Bulong mạ nhúng nóng M16x50"
+                    placeholder="VD: Bulong 10.9 mạ dacromet M24x90"
                 )
             with sub_c2:
                 t_sl = st.number_input(
@@ -372,8 +373,8 @@ with main_col:
         st.markdown("---")
         st.info("📖 **HƯỚNG DẪN NGUYÊN TẮC TẠO MÃ LINH KIỆN / VẬT TƯ:**\n"
                   "- **Cấu trúc mã chuẩn:** `VT-[Tên_Viết_Tắt]` hoặc `LK-[Tên_Viết_Tắt]`\n"
-                  "- **Ví dụ:** Vật tư tên *'Bulong mạ dacromet M24x85'* ➡️ Tự sinh mã gọn: `VT-BL_MA_DACROMET_M24X85`\n"
-                  "- ⚠️ **Lưu ý:** Nếu mã trùng với dữ liệu cũ trong kho, màn hình sẽ hiển thị **cảnh báo đỏ** ngay lập tức.")
+                  "- **Ví dụ:** Vật tư tên *'Bulong 10.9 mạ dacromet M24x90'* ➡️ Tự sinh mã: `VT-BL_10.9_MA_DACROMET_M24X90`\n"
+                  "- ⚠️ **Lưu ý:** Cho phép dùng dấu chấm (`.`) cho cấp bền/kích thước, loại bỏ ngoặc đơn `()`. Nếu mã trùng với kho sẽ có **cảnh báo đỏ**.")
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
@@ -420,7 +421,7 @@ with main_col:
             ten_lk = st.text_input(
                 "Tên linh kiện / vật tư", 
                 value=st.session_state.le_ten_input_val, 
-                placeholder="VD: Bulong mạ dacromet M24x85",
+                placeholder="VD: Bulong 10.9 mạ dacromet M24x90",
                 key="le_ten_widget"
             )
             if ten_lk != st.session_state.le_ten_input_val:
