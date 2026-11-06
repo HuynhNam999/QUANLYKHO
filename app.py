@@ -77,7 +77,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-# --- MENU ĐIỀU HƯỚNG BÊN TRÁI (Đã sắp xếp lại vị trí Điều chỉnh giá lên trên Nhập mới) ---
+# --- MENU ĐIỀU HƯỚNG BÊN TRÁI ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
@@ -86,8 +86,8 @@ menu_choice = st.sidebar.radio(
     [
         "📊 Tổng quan tồn kho", 
         "🔍 Tra cứu & Lọc chi tiết", 
-        "✏️ Điều chỉnh thông tin & Giá Combo",
         "📥 Nhập mới Combo", 
+        "✏️ Điều chỉnh thông tin & Giá Combo",
         "📥 Nhập mới Linh kiện lẻ", 
         "🔄 Xé lẻ Combo thành Linh kiện", 
         "📤 Xuất kho Combo", 
@@ -210,7 +210,93 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO
+    # 3. NHẬP MỚI COMBO
+    elif menu_choice == "📥 Nhập mới Combo":
+        st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
+        st.markdown("---")
+        c1, c2 = st.columns(2)
+        with c1:
+            ten_lk = st.text_input("Tên Combo", placeholder="VD: Bộ bàn gỗ lim 1.2M", key="new_cb_ten")
+            auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
+            cb_ma_mode = st.radio("Phương thức mã Combo:", ["🤖 Tự sinh", "✍️ Tự viết"], horizontal=True, key="new_cb_mode")
+            if cb_ma_mode.startswith("🤖"):
+                ma_lk = st.text_input("Mã Combo (Tự động)", value=auto_cb_code, key="new_cb_autocode")
+            else:
+                ma_lk = st.text_input("Mã Combo (Tự viết)", value=auto_cb_code, key="new_cb_manualcode")
+            don_vi_nhap = st.selectbox("Đơn vị giao dịch khi nhập", ["Đơn vị lẻ (Cái/Bộ)", "📦 Kiện (Đóng thùng)"], key="new_cb_dv_nhap")
+            so_luong_nhap = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="new_cb_sl")
+            quy_cach = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=1, key="new_cb_qc")
+            so_luong_thuc_te = so_luong_nhap * quy_cach if don_vi_nhap.startswith("📦") else so_luong_nhap
+            barcode = st.text_input("Mã vạch (Barcode)", placeholder="Quét hoặc nhập mã vạch...", key="new_cb_bc")
+        with c2:
+            don_vi = st.selectbox("Đơn vị tính cơ bản", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
+            gia_nhap = st.number_input("Giá nhập Combo (VNĐ)", min_value=0.0, step=1000.0, value=0.0, key="new_cb_gn")
+            gia_xuat = st.number_input("Giá xuất Combo (VNĐ)", min_value=0.0, step=1000.0, value=0.0, key="new_cb_gx")
+            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", key="new_cb_img")
+        if don_vi_nhap.startswith("📦") and so_luong_nhap > 0:
+            st.info(f"💡 Quy đổi hệ thống: **{so_luong_nhap} Kiện** x {quy_cach} = **{so_luong_thuc_te} {don_vi}** sẽ được cộng vào kho.")
+        if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
+            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống!")
+        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập mới lô combo đầu năm", key="new_cb_note")
+        st.markdown("---")
+        st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN & GIÁ CHI TIẾT")
+        tps_input = []
+        for i in range(1, 11):
+            st.markdown(f"**Thành phần {i}**")
+            sub_c1, sub_c2, sub_c_dv, sub_c_gia = st.columns([3, 1, 1, 1.5])
+            with sub_c1:
+                t_name = st.text_input(f"Tên linh kiện {i}", placeholder="VD: Bulong M24", key=f"new_tp_{i}_ten")
+            with sub_c2:
+                t_sl = st.number_input(f"Định mức {i}", min_value=1, value=1, key=f"new_tp_{i}_sl")
+            with sub_c_dv:
+                t_dv = st.selectbox(f"Đơn vị {i}", ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"], key=f"new_tp_{i}_dv")
+            with sub_c_gia:
+                t_gia = st.number_input(f"Giá linh kiện {i} (VNĐ)", min_value=0.0, step=1000.0, value=0.0, key=f"new_tp_{i}_gia")
+            sub_c3, sub_c4 = st.columns([3, 1])
+            with sub_c3:
+                final_tp_code = st.text_input(f"Mã linh kiện {i}", value=generate_code_from_name(t_name, is_combo=False), key=f"new_tp_{i}_ma")
+            with sub_c4:
+                t_img = st.text_input(f"Link ảnh {i}", key=f"new_tp_{i}_img")
+            st.markdown("---")
+            tps_input.append({
+                "ten": t_name,
+                "ma": final_tp_code,
+                "sl": int(t_sl),
+                "dv": t_dv,
+                "gia": float(t_gia),
+                "img": t_img.strip() if t_img else ""
+            })
+        danh_sach_thanh_phan = [item for item in tps_input if item["ten"] and item["ten"].strip() != ""]
+        st.markdown("")
+        if st.button("💾 Lưu Mới Combo vào Database", type="primary", use_container_width=True):
+            if ma_lk and ten_lk:
+                try:
+                    ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập kho mới: {so_luong_thuc_te} {don_vi}"
+                    if ghi_chu_tay:
+                        nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
+                    new_data = {
+                        "Ma_LK": ma_lk,
+                        "Ten_LK": ten_lk,
+                        "So_luong": int(so_luong_thuc_te),
+                        "Don_vi": don_vi,
+                        "Nhat_ky": nhat_ky_str,
+                        "Hinh_anh": hinh_anh,
+                        "Thanh_phan": danh_sach_thanh_phan,
+                        "Gia_nhap": float(gia_nhap),
+                        "Gia_xuat": float(gia_xuat),
+                        "Barcode": barcode.strip(),
+                        "Quy_cach": int(quy_cach)
+                    }
+                    supabase.table("Ton_kho").upsert(new_data).execute()
+                    st.success("Đã tạo mới Combo thành công vào Database!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Lỗi khi lưu dữ liệu: {e}")
+            else:
+                st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
+    # 4. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO (Đã thêm ô Giá linh kiện)
     elif menu_choice == "✏️ Điều chỉnh thông tin & Giá Combo":
         st.title("✏️ ĐIỀU CHỈNH THÔNG TIN, GIÁ & THÀNH PHẦN COMBO")
         st.markdown("---")
@@ -340,92 +426,6 @@ with main_col:
                         st.error(f"Lỗi khi cập nhật: {e}")
                 else:
                     st.warning("Vui lòng bấm nút 'Nạp dữ liệu cũ lên Form' trước khi lưu!")
-    # 4. NHẬP MỚI COMBO
-    elif menu_choice == "📥 Nhập mới Combo":
-        st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
-        st.markdown("---")
-        c1, c2 = st.columns(2)
-        with c1:
-            ten_lk = st.text_input("Tên Combo", placeholder="VD: Bộ bàn gỗ lim 1.2M", key="new_cb_ten")
-            auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
-            cb_ma_mode = st.radio("Phương thức mã Combo:", ["🤖 Tự sinh", "✍️ Tự viết"], horizontal=True, key="new_cb_mode")
-            if cb_ma_mode.startswith("🤖"):
-                ma_lk = st.text_input("Mã Combo (Tự động)", value=auto_cb_code, key="new_cb_autocode")
-            else:
-                ma_lk = st.text_input("Mã Combo (Tự viết)", value=auto_cb_code, key="new_cb_manualcode")
-            don_vi_nhap = st.selectbox("Đơn vị giao dịch khi nhập", ["Đơn vị lẻ (Cái/Bộ)", "📦 Kiện (Đóng thùng)"], key="new_cb_dv_nhap")
-            so_luong_nhap = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="new_cb_sl")
-            quy_cach = st.number_input("Quy cách: 1 Kiện = ? Đơn vị lẻ", min_value=1, step=1, value=1, key="new_cb_qc")
-            so_luong_thuc_te = so_luong_nhap * quy_cach if don_vi_nhap.startswith("📦") else so_luong_nhap
-            barcode = st.text_input("Mã vạch (Barcode)", placeholder="Quét hoặc nhập mã vạch...", key="new_cb_bc")
-        with c2:
-            don_vi = st.selectbox("Đơn vị tính cơ bản", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
-            gia_nhap = st.number_input("Giá nhập Combo (VNĐ)", min_value=0.0, step=1000.0, value=0.0, key="new_cb_gn")
-            gia_xuat = st.number_input("Giá xuất Combo (VNĐ)", min_value=0.0, step=1000.0, value=0.0, key="new_cb_gx")
-            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", key="new_cb_img")
-        if don_vi_nhap.startswith("📦") and so_luong_nhap > 0:
-            st.info(f"💡 Quy đổi hệ thống: **{so_luong_nhap} Kiện** x {quy_cach} = **{so_luong_thuc_te} {don_vi}** sẽ được cộng vào kho.")
-        if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
-            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống!")
-        ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập mới lô combo đầu năm", key="new_cb_note")
-        st.markdown("---")
-        st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN & GIÁ CHI TIẾT")
-        tps_input = []
-        for i in range(1, 11):
-            st.markdown(f"**Thành phần {i}**")
-            sub_c1, sub_c2, sub_c_dv, sub_c_gia = st.columns([3, 1, 1, 1.5])
-            with sub_c1:
-                t_name = st.text_input(f"Tên linh kiện {i}", placeholder="VD: Bulong M24", key=f"new_tp_{i}_ten")
-            with sub_c2:
-                t_sl = st.number_input(f"Định mức {i}", min_value=1, value=1, key=f"new_tp_{i}_sl")
-            with sub_c_dv:
-                t_dv = st.selectbox(f"Đơn vị {i}", ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp", "Cuộn"], key=f"new_tp_{i}_dv")
-            with sub_c_gia:
-                t_gia = st.number_input(f"Giá linh kiện {i} (VNĐ)", min_value=0.0, step=1000.0, value=0.0, key=f"new_tp_{i}_gia")
-            sub_c3, sub_c4 = st.columns([3, 1])
-            with sub_c3:
-                final_tp_code = st.text_input(f"Mã linh kiện {i}", value=generate_code_from_name(t_name, is_combo=False), key=f"new_tp_{i}_ma")
-            with sub_c4:
-                t_img = st.text_input(f"Link ảnh {i}", key=f"new_tp_{i}_img")
-            st.markdown("---")
-            tps_input.append({
-                "ten": t_name,
-                "ma": final_tp_code,
-                "sl": int(t_sl),
-                "dv": t_dv,
-                "gia": float(t_gia),
-                "img": t_img.strip() if t_img else ""
-            })
-        danh_sach_thanh_phan = [item for item in tps_input if item["ten"] and item["ten"].strip() != ""]
-        st.markdown("")
-        if st.button("💾 Lưu Mới Combo vào Database", type="primary", use_container_width=True):
-            if ma_lk and ten_lk:
-                try:
-                    ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
-                    nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                    nhat_ky_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập kho mới: {so_luong_thuc_te} {don_vi}"
-                    if ghi_chu_tay:
-                        nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
-                    new_data = {
-                        "Ma_LK": ma_lk,
-                        "Ten_LK": ten_lk,
-                        "So_luong": int(so_luong_thuc_te),
-                        "Don_vi": don_vi,
-                        "Nhat_ky": nhat_ky_str,
-                        "Hinh_anh": hinh_anh,
-                        "Thanh_phan": danh_sach_thanh_phan,
-                        "Gia_nhap": float(gia_nhap),
-                        "Gia_xuat": float(gia_xuat),
-                        "Barcode": barcode.strip(),
-                        "Quy_cach": int(quy_cach)
-                    }
-                    supabase.table("Ton_kho").upsert(new_data).execute()
-                    st.success("Đã tạo mới Combo thành công vào Database!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Lỗi khi lưu dữ liệu: {e}")
-            else:
-                st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
     # 5. NHẬP MỚI LINH KIỆN LẺ
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
