@@ -285,14 +285,20 @@ with main_col:
                             if sub_img:
                                 if str(sub_img).startswith("http"):
                                     st.image(str(sub_img), width=80)
+                                elif str(sub_img).startswith("local_file_"):
+                                    st.info(f"📁 Ảnh đính kèm: {sub_img.replace('local_file_', '')}")
                                 else:
                                     st.info(f"Ảnh linh kiện: {sub_img}")
                 with col_info2:
                     img_url = item_row.get('Hinh_anh', '')
-                    if img_url and str(img_url).startswith("http"):
-                        st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=280)
-                    elif img_url:
-                        st.info(f"📁 Tên file ảnh lưu trữ: {img_url}")
+                    if img_url:
+                        if str(img_url).startswith("http"):
+                            st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=280)
+                        elif str(img_url).startswith("local_file_"):
+                            st.info(f"📁 Tên file ảnh tải lên: {img_url.replace('local_file_', '')}")
+                            st.info("💡 Ảnh được lưu trữ tham chiếu trên thiết bị của bạn.")
+                        else:
+                            st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=280)
                     else:
                         st.info("Chưa có link hình ảnh.")
             st.markdown("### 📋 NHẬT KÝ KHO")
