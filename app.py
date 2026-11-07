@@ -247,12 +247,11 @@ with main_col:
                 st.dataframe(df_display, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm sản phẩm mới!")
-    # 2. TRA CỨU & LỌC CHI TIẾT (Lựa chọn Combo hoặc Linh kiện lẻ hiển thị cả trong bộ)
+    # 2. TRA CỨU & LỌC CHI TIẾT
     elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
         st.title("🔍 TRA CỨU, LỌC CHI TIẾT & QUÉT MÃ QR")
         st.markdown("---")
         if not df.empty:
-            # Thu thập toàn bộ linh kiện độc lập lẫn linh kiện ẩn trong các Combo
             all_linh_kien_dict = {}
             combo_dict_tc = {}
             for _, r in df.iterrows():
@@ -280,7 +279,6 @@ with main_col:
                             "Gia_xuat": gx, "Loai": "Linh kiện độc lập", "Thuoc_combo": []
                         }
                     all_linh_kien_dict[m]["Thuoc_combo"].append("Kho độc lập")
-                # Quét các thành phần bên trong Combo để thấy linh kiện dù nằm trong bộ
                 if tp and isinstance(tp, list):
                     for sub in tp:
                         sub_m = sub.get("ma")
@@ -289,7 +287,6 @@ with main_col:
                         sub_gia = float(sub.get("gia", 0))
                         if sub_m:
                             if sub_m not in all_linh_kien_dict:
-                                # Kiểm tra xem linh kiện con này có kho riêng không
                                 sub_match_db = df[df["Ma_LK"] == sub_m]
                                 sub_sl_ton = sub_match_db.iloc[0]["So_luong"] if not sub_match_db.empty else 0
                                 sub_kho_ton = sub_match_db.iloc[0].get("Kho_quan_ly", kho) if not sub_match_db.empty else kho
@@ -346,10 +343,9 @@ with main_col:
                     st.write(f"**💰 Giá nhập:** {format_money(current_detail.get('Gia_nhap', 0))} VNĐ")
                     if current_detail.get('Gia_xuat', 0) > 0:
                         st.write(f"**🏷️ Giá xuất:** {format_money(current_detail.get('Gia_xuat', 0))} VNĐ")
-                    # Nếu là linh kiện lẻ, hiển thị thêm thông tin linh kiện này thuộc những combo nào
                     if "🔩" in che_do_xem:
                         thuoc_cb = current_detail.get('Thuoc_combo', [])
-                        st.markdown(**🔗 Phân bổ trong hệ thống:**)
+                        st.markdown("**🔗 Phân bổ trong hệ thống:**")
                         for tc in thuoc_cb:
                             st.write(f"- {tc}")
                     tp_hien_thi = current_detail.get('Thanh_phan', [])
@@ -779,7 +775,7 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng kiểm tra lại Mã, Tên Combo hoặc tránh trùng mã/trùng tên trên toàn hệ thống!")
-    # 5. NHẬP COMBO CŨ (Quét mã QR để nạp dữ liệu nhanh)
+    # 5. NHẬP COMBO CŨ
     elif menu_choice == "📥 Nhập Combo cũ":
         st.title("📦 NHẬP BỔ SUNG COMBO CŨ")
         render_code_guide()
@@ -992,7 +988,7 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã, Tên linh kiện hoặc tránh trùng mã/trùng tên trên toàn hệ thống!")
-    # 7. NHẬP LINH KIỆN CŨ (Quét mã QR để nạp dữ liệu nhanh)
+    # 7. NHẬP LINH KIỆN CŨ
     elif menu_choice == "📥 Nhập linh kiện cũ":
         st.title("🔩 NHẬP BỔ SUNG LINH KIỆN / VẬT TƯ CŨ")
         render_code_guide()
@@ -1253,7 +1249,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 9. XUẤT KHO COMBO (Quét mã QR để xuất nhanh)
+    # 9. XUẤT KHO COMBO
     elif menu_choice == "📤 Xuất kho Combo":
         st.title("📤 XUẤT KHO COMBO (Tự động trừ định mức linh kiện/vật tư con)")
         st.markdown("---")
@@ -1368,7 +1364,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 10. XUẤT KHO LINH KIỆN LẺ (Quét mã QR để xuất nhanh)
+    # 10. XUẤT KHO LINH KIỆN LẺ
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
         st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập & Thành phần)")
         st.markdown("---")
@@ -1519,30 +1515,3 @@ with main_col:
             st.warning("Kho hiện đang trống!")
     # 11. BÁO CÁO & XUẤT EXCEL
     elif menu_choice == "📈 Báo cáo & Xuất Excel":
-        st.title("📈 Báo Cáo Kho & Xuất File Excel")
-        st.markdown("---")
-        st.info("💡 Bạn có thể tải toàn bộ dữ liệu tồn kho dưới dạng file **Excel (.xlsx)**.")
-        if not df.empty:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_ton_kho = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach"]].copy()
-                df_ton_kho.columns = ["Mã QR Sản Phẩm / Combo", "Tên Sản Phẩm", "Kho Quản Lý", "Số Lượng Tồn Kho", "Đơn Vị Tính", "Quy Cách (SL/Kiện)"]
-                df_ton_kho.to_excel(writer, sheet_name='Ton_Kho_Hien_Tai', index=False)
-                df_nhat_ky = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Nhat_ky"]].copy()
-                df_nhat_ky.columns = ["Mã QR Sản Phẩm", "Tên Sản Phẩm", "Kho Quản Lý", "Lịch Sử Nhật Ký Chi Tiết"]
-                df_nhat_ky.to_excel(writer, sheet_name='Lich_Su_Nhat_Ky', index=False)
-            excel_data = output.getvalue()
-            time_stamp = datetime.now().strftime("%Y%m%d_%H%M")
-            col_rep1, col_rep2 = st.columns(2)
-            with col_rep1:
-                st.metric("Tổng số mặt hàng / Combo", len(df["Ma_LK"].unique()))
-                st.metric("Tổng lượng kho", int(df["So_luong"].sum()) if "So_luong" in df else 0)
-            with col_rep2:
-                st.download_button(
-                    label="📥 Tải Báo Cáo Kho Dạng Excel (.xlsx)",
-                    data=excel_data,
-                    file_name=f"Bao_Cao_Da_Kho_{time_stamp}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-        else:
-            st.warning("Kho hiện đang trống!")
