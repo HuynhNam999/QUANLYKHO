@@ -227,7 +227,7 @@ with main_col:
         if not df.empty:
             col_sc1, col_sc2 = st.columns([2, 2])
             with col_sc1:
-                barcode_search = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để tra cứu nhanh", placeholder="Nhấn vào đây rồi quét mã vạch...")
+                barcode_search = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để tra cứu nhanh", placeholder="Nhấn vào đây rồi quét mã vạch...")[cite: 11]
             target_ma_lk = None
             if barcode_search.strip():
                 matched_bc = df[df["Barcode"].str.contains(barcode_search.strip(), case=False, na=False)]
@@ -245,7 +245,7 @@ with main_col:
             with col_f2:
                 ma_list = df["Ma_LK"].unique().tolist()
                 default_idx = ma_list.index(target_ma_lk) if target_ma_lk in ma_list else 0
-                selected_item = st.selectbox("Chọn mã linh kiện", ma_list, index=default_idx) if ma_list else None
+                selected_item = st.selectbox("Chọn mã linh kiện", ma_list, index=default_idx) if ma_list else None[cite: 11]
             with col_f3:
                 bat_tat_ngay = st.checkbox("Lọc theo ngày cụ thể")
                 ngay_chon = st.date_input("Chọn ngày", value=date.today())
@@ -273,11 +273,13 @@ with main_col:
                             sub_dv = tp.get('dv', 'Cái')
                             sub_gia = tp.get('gia', 0)
                             sub_img = tp.get('img', '')
+                            sub_bc_tp = tp.get('barcode', '')
                             sub_match = df[df["Ma_LK"] == sub_m]
                             if not sub_name and not sub_match.empty:
                                 sub_name = sub_match.iloc[0]["Ten_LK"]
                             gia_str = f" | Giá: **{format_money(sub_gia)} VNĐ**" if sub_gia else ""
-                            st.write(f"- `{sub_m}` ({sub_name}) | Định mức: **{sub_sl} {sub_dv}**{gia_str}")
+                            bc_str = f" | Barcode: `{sub_bc_tp}`" if sub_bc_tp else ""
+                            st.write(f"- `{sub_m}` ({sub_name}) | Định mức: **{sub_sl} {sub_dv}**{gia_str}{bc_str}")
                             if sub_img:
                                 st.image(sub_img, width=80)
                 with col_info2:
@@ -349,6 +351,7 @@ with main_col:
                                 st.session_state[f"ef_tp_{idx_l}_gia"] = int(item_t.get("gia", 0)) if item_t.get("gia") else 0
                                 st.session_state[f"ef_tp_{idx_l}_ma"] = item_t.get("ma", "")
                                 st.session_state[f"ef_tp_{idx_l}_img"] = item_t.get("img", "")
+                                st.session_state[f"ef_tp_{idx_l}_bc"] = item_t.get("barcode", "")
                                 st.session_state[f"ef_tp_{idx_l}_mode"] = "✍️ Tự viết"
                             else:
                                 st.session_state[f"ef_tp_{idx_l}_ten"] = ""
@@ -357,6 +360,7 @@ with main_col:
                                 st.session_state[f"ef_tp_{idx_l}_gia"] = 0
                                 st.session_state[f"ef_tp_{idx_l}_ma"] = ""
                                 st.session_state[f"ef_tp_{idx_l}_img"] = ""
+                                st.session_state[f"ef_tp_{idx_l}_bc"] = ""
                                 st.session_state[f"ef_tp_{idx_l}_mode"] = "🤖 Tự sinh"
                     st.success(f"Đã nạp dữ liệu của `{st.session_state.selected_cb_to_edit}` lên form!")
                     st.rerun()
@@ -407,12 +411,13 @@ with main_col:
                 elif field == 'gia': session_key += 'gia'
                 elif field == 'ma': session_key += 'ma'
                 elif field == 'img': session_key += 'img'
+                elif field == 'barcode': session_key += 'bc'
                 if session_key in st.session_state:
                     return st.session_state[session_key]
                 if (idx - 1) < len(def_tp) and isinstance(def_tp, list):
                     val = def_tp[idx - 1].get(field, "")
-                    return val if val is not None else ("" if field in ['ten', 'ma', 'img'] else (1 if field == 'sl' else 0))
-                return "" if field in ['ten', 'ma', 'img'] else (1 if field == 'sl' else 0)
+                    return val if val is not None else ("" if field in ['ten', 'ma', 'img', 'barcode'] else (1 if field == 'sl' else 0))
+                return "" if field in ['ten', 'ma', 'img', 'barcode'] else (1 if field == 'sl' else 0)
             tps_input_e = []
             for i in range(1, 11):
                 st.markdown(f"**Thành phần {i}**")
@@ -455,7 +460,7 @@ with main_col:
                 prefix_tp_e = "LK" if "LK" in item_cat_tp_e else "VT"
                 auto_code_tp_e = generate_code_from_name(t_name_e, is_combo=False, item_type=prefix_tp_e)
                 old_code_e = get_tp_val_e(i, 'ma')
-                sub_c3, sub_c4 = st.columns([3, 1])
+                sub_c3, sub_c4, sub_c_bc = st.columns([2.5, 1.5, 2])
                 with sub_c3:
                     if item_mode_tp_e.startswith("🤖"):
                         final_tp_code_e = st.text_input(f"Mã linh kiện {i} (Tự động từ hệ thống)", value=auto_code_tp_e, key=f"ef_tp_{i}_show_auto", disabled=True)
@@ -464,6 +469,8 @@ with main_col:
                         final_tp_code_e = st.text_input(f"Mã linh kiện {i} (Cá nhân tự viết)", value=str(manual_e_def), key=f"ef_tp_{i}_ma")
                 with sub_c4:
                     t_img_e = st.text_input(f"Link ảnh {i}", value=str(get_tp_val_e(i, 'img')), key=f"ef_tp_{i}_img")
+                with sub_c_bc:
+                    t_barcode_e = st.text_input(f"Quét/Nhập Barcode linh kiện {i}", value=str(get_tp_val_e(i, 'barcode')), key=f"ef_tp_{i}_bc")
                 st.markdown("---")
                 tps_input_e.append({
                     "ten": t_name_e,
@@ -471,7 +478,8 @@ with main_col:
                     "sl": int(t_sl_e),
                     "dv": t_dv_e,
                     "gia": int(t_gia_e),
-                    "img": t_img_e.strip() if t_img_e else ""
+                    "img": t_img_e.strip() if t_img_e else "",
+                    "barcode": t_barcode_e.strip() if t_barcode_e else ""
                 })
             danh_sach_thanh_phan_e = [item for item in tps_input_e if item["ten"] and item["ten"].strip() != ""]
             submit_edit = st.form_submit_button("💾 Cập nhật Thay đổi vào Database", type="primary", use_container_width=True)
@@ -606,7 +614,7 @@ with main_col:
                 )
             prefix_tp = "LK" if "LK" in item_cat_tp else "VT"
             auto_code_tp = generate_code_from_name(t_name, is_combo=False, item_type=prefix_tp)
-            sub_c3, sub_c4 = st.columns([3, 1])
+            sub_c3, sub_c4, sub_c_bc = st.columns([2.5, 1.5, 2])
             with sub_c3:
                 if item_mode_tp.startswith("🤖"):
                     final_tp_code = st.text_input(f"Mã linh kiện {i} (Tự động từ hệ thống)", value=auto_code_tp, key=f"tp_{i}_show_auto", disabled=True)
@@ -614,6 +622,8 @@ with main_col:
                     final_tp_code = st.text_input(f"Mã linh kiện {i} (Cá nhân tự viết)", key=tma_key)
             with sub_c4:
                 t_img = st.text_input(f"Link ảnh {i}", key=f"new_tp_{i}_img")
+            with sub_c_bc:
+                t_barcode = st.text_input(f"Quét/Nhập Barcode linh kiện {i}", key=f"new_tp_{i}_bc")
             st.markdown("---")
             tps_input.append({
                 "ten": t_name,
@@ -621,7 +631,8 @@ with main_col:
                 "sl": int(t_sl),
                 "dv": t_dv,
                 "gia": int(t_gia),
-                "img": t_img.strip() if t_img else ""
+                "img": t_img.strip() if t_img else "",
+                "barcode": t_barcode.strip() if t_barcode else ""
             })
         danh_sach_thanh_phan = [item for item in tps_input if item["ten"] and item["ten"].strip() != ""]
         st.markdown("")
@@ -654,13 +665,23 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
-    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ TỐI ƯU LOAD MÃ CŨ)
+    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ CẬP NHẬT THEO GIAO DIỆN TRA CỨU & GỢI Ý TÌM KIẾM)
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         render_code_guide()
         st.markdown("---")
-        # Gom nhóm toàn bộ linh kiện/vật tư độc lập từ mọi kho để load mã cũ chuẩn xác
-        existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
+        # 1. Ô Quét mã vạch nhanh (giống tra cứu)
+        barcode_input_le = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để chọn nhanh linh kiện", placeholder="Nhấn vào đây rồi quét mã vạch...")[cite: 11]
+        matched_item_by_bc = None
+        if barcode_input_le.strip():
+            matched_bc_df = df[df["Barcode"].str.contains(barcode_input_le.strip(), case=False, na=False)]
+            if not matched_bc_df.empty:
+                matched_item_by_bc = matched_bc_df.iloc[0].to_dict()
+                st.success(f"✨ Đã nhận diện qua mã vạch: **{matched_item_by_bc['Ten_LK']}** (`{matched_item_by_bc['Ma_LK']}`)")
+            else:
+                st.warning("⚠️ Không tìm thấy linh kiện nào khớp với mã vạch này.")
+        # 2. Thao tác: Nhập mới hoàn toàn hay Load dữ liệu cũ
+        thao_tac_nhap = st.radio("Thao tác:", ["✨ Nhập mới hoàn toàn", "📂 Load lại dữ liệu cũ"], horizontal=True, key="le_thao_tac_radio")
         item_dict = {}
         if not df.empty:
             df_le = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)].copy()
@@ -670,71 +691,56 @@ with main_col:
                 kho_ql = r.get("Kho_quan_ly", "Kho 1")
                 display_str = f"{m_code} - {t_name} (Kho: {kho_ql})"
                 if display_str not in item_dict:
-                    existing_items.append(display_str)
                     item_dict[display_str] = r.to_dict()
-        def on_le_select_change():
-            sel = st.session_state.get("le_sel_box", "-- Tạo mới / Nhập mới hoàn toàn --")
-            if sel != "-- Tạo mới / Nhập mới hoàn toàn --":
-                row_data = item_dict[sel]
-                st.session_state.le_ten_input_val = row_data.get("Ten_LK", "")
-                st.session_state.le_ma_input_val = row_data.get("Ma_LK", "")
-                st.session_state.le_kho_val = row_data.get("Kho_quan_ly", "Kho 1")
-                st.session_state.le_dv_input_val = row_data.get("Don_vi", "Cái")
-                st.session_state.le_img_input_val = row_data.get("Hinh_anh", "")
-                st.session_state.le_gianhap_val = int(row_data.get("Gia_nhap", 0)) if row_data.get("Gia_nhap") else 0
-                st.session_state.le_giaxuat_val = int(row_data.get("Gia_xuat", 0)) if row_data.get("Gia_xuat") else 0
-                st.session_state.le_barcode_val = row_data.get("Barcode", "") if row_data.get("Barcode") else ""
-                st.session_state.le_quycach_val = int(row_data.get("Quy_cach", 1)) if row_data.get("Quy_cach") else 1
-                st.session_state.single_item_method_radio = "✍️ Tự viết"
-            else:
-                st.session_state.le_ten_input_val = ""
-                st.session_state.le_ma_input_val = ""
-                st.session_state.le_kho_val = "Kho 1"
-                st.session_state.le_dv_input_val = "Cái"
-                st.session_state.le_img_input_val = ""
-                st.session_state.le_gianhap_val = 0
-                st.session_state.le_giaxuat_val = 0
-                st.session_state.le_barcode_val = ""
-                st.session_state.le_quycach_val = 1
-                st.session_state.single_item_method_radio = "🤖 Tự sinh"
-        selected_existing = st.selectbox(
-            "🔍 Chọn mã linh kiện/vật tư có sẵn (hoặc chọn 'Tạo mới')", 
-            existing_items,
-            key="le_sel_box",
-            on_change=on_le_select_change
-        )
-        if "le_ten_input_val" not in st.session_state:
-            st.session_state.le_ten_input_val = ""
-        if "le_ma_input_val" not in st.session_state:
-            st.session_state.le_ma_input_val = ""
-        if "le_kho_val" not in st.session_state:
-            st.session_state.le_kho_val = "Kho 1"
-        if "le_dv_input_val" not in st.session_state:
-            st.session_state.le_dv_input_val = "Cái"
-        if "le_img_input_val" not in st.session_state:
-            st.session_state.le_img_input_val = ""
-        if "le_gianhap_val" not in st.session_state:
-            st.session_state.le_gianhap_val = 0
-        if "le_giaxuat_val" not in st.session_state:
-            st.session_state.le_giaxuat_val = 0
-        if "le_barcode_val" not in st.session_state:
-            st.session_state.le_barcode_val = ""
-        if "le_quycach_val" not in st.session_state:
-            st.session_state.le_quycach_val = 1
-        if "single_item_method_radio" not in st.session_state:
-            st.session_state.single_item_method_radio = "🤖 Tự sinh"
+        selected_row_data = None
+        if matched_item_by_bc:
+            selected_row_data = matched_item_by_bc
+        elif thao_tac_nhap == "📂 Load lại dữ liệu cũ" and item_dict:
+            # Thanh tìm kiếm dữ liệu cũ tự hiển thị gợi ý khi nhập ký tự
+            selected_existing_str = st.selectbox(
+                "🔍 Nhập / Chọn mã hoặc tên linh kiện cũ cần load:", 
+                ["-- Chọn linh kiện cũ --"] + list(item_dict.keys()),
+                key="le_selectbox_old"
+            )
+            if selected_existing_str != "-- Chọn linh kiện cũ --":
+                selected_row_data = item_dict[selected_existing_str]
+        # Xử lý gán giá trị lên form
+        if "le_form_init" not in st.session_state:
+            st.session_state.le_form_init = True
+            st.session_state.f_ten = ""
+            st.session_state.f_ma = ""
+            st.session_state.f_kho = "Kho 1"
+            st.session_state.f_dv = "Cái"
+            st.session_state.f_img = ""
+            st.session_state.f_gn = 0
+            st.session_state.f_gx = 0
+            st.session_state.f_bc = ""
+            st.session_state.f_qc = 1
+            st.session_state.f_method = "🤖 Tự sinh"
+        if selected_row_data:
+            st.session_state.f_ten = selected_row_data.get("Ten_LK", "")
+            st.session_state.f_ma = selected_row_data.get("Ma_LK", "")
+            st.session_state.f_kho = selected_row_data.get("Kho_quan_ly", "Kho 1")
+            st.session_state.f_dv = selected_row_data.get("Don_vi", "Cái")
+            st.session_state.f_img = selected_row_data.get("Hinh_anh", "")
+            st.session_state.f_gn = int(selected_row_data.get("Gia_nhap", 0)) if selected_row_data.get("Gia_nhap") else 0
+            st.session_state.f_gx = int(selected_row_data.get("Gia_xuat", 0)) if selected_row_data.get("Gia_xuat") else 0
+            st.session_state.f_bc = selected_row_data.get("Barcode", "") if selected_row_data.get("Barcode") else ""
+            st.session_state.f_qc = int(selected_row_data.get("Quy_cach", 1)) if selected_row_data.get("Quy_cach") else 1
+            st.session_state.f_method = "✍️ Tự viết"
+        elif thao_tac_nhap == "✨ Nhập mới hoàn toàn" and not matched_item_by_bc:
+            if "le_selectbox_old" in st.session_state and st.session_state.le_selectbox_old != "-- Chọn linh kiện cũ --":
+                pass
         c1, c2 = st.columns(2)
         with c1:
             ten_lk = st.text_input(
                 "Tên linh kiện / vật tư", 
-                value=st.session_state.le_ten_input_val, 
+                value=st.session_state.f_ten, 
                 placeholder="VD: Bulong 10.9 mạ dacromet M24x90",
                 key="le_ten_widget"
             )
-            if ten_lk != st.session_state.le_ten_input_val:
-                st.session_state.le_ten_input_val = ten_lk
-                st.rerun()
-            kho_idx_le = danh_sach_kho_mac_dinh.index(st.session_state.le_kho_val) if st.session_state.le_kho_val in danh_sach_kho_mac_dinh else 0
+            st.session_state.f_ten = ten_lk
+            kho_idx_le = danh_sach_kho_mac_dinh.index(st.session_state.f_kho) if st.session_state.f_kho in danh_sach_kho_mac_dinh else 0
             kho_nhap_le = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, index=kho_idx_le, key="le_kho_widget")
             sub_col_type, sub_col_method = st.columns(2)
             with sub_col_type:
@@ -752,15 +758,15 @@ with main_col:
                     key="single_item_method_radio"
                 )
             prefix_type_le = "LK" if "LK" in item_cat_le else "VT"
-            auto_code_le = generate_code_from_name(st.session_state.le_ten_input_val, is_combo=False, item_type=prefix_type_le)
+            auto_code_le = generate_code_from_name(ten_lk, is_combo=False, item_type=prefix_type_le)
             if item_method_le.startswith("🤖"):
                 ma_lk = st.text_input("Mã LK / VT (Mã tự động từ hệ thống)", value=auto_code_le, key="le_code_auto_show")
             else:
-                manual_default = st.session_state.le_ma_input_val if st.session_state.le_ma_input_val else auto_code_le
+                manual_default = st.session_state.f_ma if st.session_state.f_ma else auto_code_le
                 ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=manual_default, key="le_code_manual_show")
-                st.session_state.le_ma_input_val = ma_lk
+                st.session_state.f_ma = ma_lk
             dv_list_le = ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét", "Bộ"]
-            current_dv = st.session_state.le_dv_input_val
+            current_dv = st.session_state.f_dv
             dv_idx = dv_list_le.index(current_dv) if current_dv in dv_list_le else 0
             don_vi = st.selectbox("Đơn vị tính cơ bản", dv_list_le, index=dv_idx, key="le_dv_input")
             hinh_thuc_nhap_le = st.radio(
@@ -771,19 +777,19 @@ with main_col:
             )
             so_luong_nhap_le = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="le_sl_input")
             if "📦" in hinh_thuc_nhap_le:
-                quy_cach_le = st.number_input("Quy cách: 1 Kiện = ? Đơn vị cơ bản", min_value=1, step=1, value=st.session_state.le_quycach_val, key="le_quycach_input")
+                quy_cach_le = st.number_input("Quy cách: 1 Kiện = ? Đơn vị cơ bản", min_value=1, step=1, value=st.session_state.f_qc, key="le_quycach_input")
                 so_luong_thuc_te_le = so_luong_nhap_le * quy_cach_le
                 st.info(f"💡 Quy đổi theo kiện: **{so_luong_nhap_le} Kiện** x {quy_cach_le} = **{so_luong_thuc_te_le} {don_vi}** sẽ được cộng vào kho.")
             else:
                 quy_cach_le = 1
                 so_luong_thuc_te_le = so_luong_nhap_le
                 st.info(f"💡 Nhập trực tiếp: **{so_luong_thuc_te_le} {don_vi}** sẽ được cộng vào kho.")
-            barcode = st.text_input("Mã vạch (Barcode)", value=st.session_state.le_barcode_val, placeholder="Quét hoặc nhập mã vạch...", key="le_barcode_widget")
+            barcode = st.text_input("Mã vạch (Barcode)", value=st.session_state.f_bc, placeholder="Quét hoặc nhập mã vạch...", key="le_barcode_widget")
         with c2:
             loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="le_op_input")
-            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0, step=1000, value=st.session_state.le_gianhap_val, format="%d", key="le_gianhap_widget")
-            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0, step=1000, value=st.session_state.le_giaxuat_val, format="%d", key="le_giaxuat_widget")
-            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=st.session_state.le_img_input_val, key="le_img_input")
+            gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0, step=1000, value=st.session_state.f_gn, format="%d", key="le_gianhap_widget")
+            gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0, step=1000, value=st.session_state.f_gx, format="%d", key="le_giaxuat_widget")
+            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=st.session_state.f_img, key="le_img_input")
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới", key="le_note_input")
         st.markdown("")
         if st.button("💾 Lưu Linh kiện/Vật tư lẻ vào Database", type="primary", use_container_width=True):
@@ -796,7 +802,6 @@ with main_col:
                         nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
                     old_tp = []
                     current_stock_le = so_luong_thuc_te_le
-                    # Kiểm tra xem sản phẩm đã tồn tại trong kho cụ thể đó chưa
                     matched_db = df[(df["Ma_LK"] == ma_lk) & (df["Kho_quan_ly"] == kho_nhap_le)]
                     if not matched_db.empty:
                         old_row = matched_db.iloc[0]
@@ -1048,6 +1053,7 @@ with main_col:
                         sub_m = tp.get("ma")
                         sub_name = tp.get("ten", "Linh kiện")
                         sub_dv = tp.get("dv", "Cái")
+                        sub_bc_tp = tp.get("barcode", "")
                         if sub_m and not sub_m.startswith(("CB", "CM")) and sub_m not in all_items_dict:
                             sub_match = df[df["Ma_LK"] == sub_m]
                             if not sub_match.empty:
@@ -1068,7 +1074,7 @@ with main_col:
                                     "Don_vi": sub_dv,
                                     "Hinh_anh": tp.get("img", ""),
                                     "Quy_cach": 1,
-                                    "Barcode": ""
+                                    "Barcode": sub_bc_tp
                                 }
             col_ex_sc3, col_ex_sc4 = st.columns([2, 2])
             with col_ex_sc3:
