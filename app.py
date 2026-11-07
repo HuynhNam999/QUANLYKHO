@@ -462,9 +462,7 @@ with main_col:
                                     "Loai": "Linh kiện trong Combo", "Thuoc_combo": []
                                 }
                             all_linh_kien_dict[sub_m]["Thuoc_combo"].append(f"Nằm trong Combo: {m} ({t})")
-            # MỘT Ô DUY NHẤT PHÍA TRÊN CHO VIỆC TÌM KIẾM / QUÉT / CHỌN NHANH
             st.subheader("🔎 Tìm kiếm & Quét mã sản phẩm")
-            # 1. Quét ảnh QR
             img_qr_search = st.file_uploader("📷 Chụp ảnh / Tải ảnh mã QR để tra cứu nhanh", type=["jpg", "jpeg", "png"], key="search_qr_img_upload")
             scanned_search_code = None
             if img_qr_search is not None:
@@ -492,23 +490,19 @@ with main_col:
                         st.success(f"✨ Nhận diện mã từ ảnh: `{scanned_search_code}`")
                 except Exception as e:
                     st.error(f"Không thể đọc ảnh: {e}")
-            # 2. Chọn nhanh từ danh sách có sẵn (Gộp cả Combo và Linh kiện)
             all_combined_options = ["-- Hoặc chọn sản phẩm từ danh sách --"]
             for m_key, c_info in combo_dict_tc.items():
                 all_combined_options.append(f"[Combo] {m_key} - {c_info['Ten_LK']} (Kho: {c_info['Kho_quan_ly']} | Tồn: {c_info['So_luong']} {c_info['Don_vi']})")
             for m_key, l_info in all_linh_kien_dict.items():
                 all_combined_options.append(f"[Linh kiện] {m_key} - {l_info['Ten_LK']} (Kho: {l_info['Kho_quan_ly']} | Tồn: {l_info['So_luong']} {l_info['Don_vi']})")
             chosen_search_opt = st.selectbox("📦 Chọn sản phẩm từ danh sách có sẵn:", all_combined_options)
-            # 3. Nhập mã thủ công / máy quét USB
             manual_search_input = st.text_input("⌨️ Hoặc dùng máy quét USB / Nhập mã thủ công:", value=scanned_search_code if scanned_search_code else "", placeholder="Gõ mã hoặc bắn máy quét...")
-            # Xác định mã sản phẩm cuối cùng được chọn từ 3 nguồn trên
             final_search_code = ""
             if manual_search_input.strip():
                 final_search_code = manual_search_input.strip()
             elif scanned_search_code:
                 final_search_code = scanned_search_code
             elif chosen_search_opt and not chosen_search_opt.startswith("--"):
-                # Cắt lấy phần mã bên trong dấu ngoặc hoặc trước dấu cách
                 parts_opt = chosen_search_opt.split(" - ")
                 raw_code_part = parts_opt[0]
                 final_search_code = raw_code_part.split("] ")[-1].strip()
@@ -552,8 +546,8 @@ with main_col:
                         mime="image/png"
                     )
             st.markdown("---")
-            st.markdown("### 📋 NHẬT KÝ KHO")
-            # BỘ LỌC NHẬT KÝ THEO KHO HOẶC TỔNG KHO
+            st.markdown("### 📋 NHẬT KÝ KHO CHI TIẾT")
+            # BỘ LỌC NHẬT KÝ
             col_nk1, col_nk2, col_nk3 = st.columns([1.5, 1.5, 2])
             with col_nk1:
                 chon_kho_nhat_ky = st.selectbox(
@@ -567,13 +561,10 @@ with main_col:
                 bat_tat_ngay = st.checkbox("Lọc theo ngày")
                 ngay_chon = st.date_input("Chọn ngày", value=date.today())
             filtered_df = df.copy()
-            # Lọc theo kho nhật ký
             if chon_kho_nhat_ky != "🌐 Tất cả các kho (Tổng kho)":
                 filtered_df = filtered_df[filtered_df["Kho_quan_ly"] == chon_kho_nhat_ky]
-            # Lọc theo sản phẩm được chọn
             if final_search_code:
                 filtered_df = filtered_df[filtered_df["Ma_LK"] == final_search_code]
-            # Lọc theo loại hoạt động
             if loai_loc != "Tất cả":
                 keyword_map = {
                     "📥 Nhập kho": "Nhập kho",
@@ -582,13 +573,63 @@ with main_col:
                 }
                 kw = keyword_map.get(loai_loc, "")
                 filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(kw, na=False)]
-            # Lọc theo ngày
             if bat_tat_ngay:
                 format_ngay = ngay_chon.strftime("%d/%m/%Y")
                 filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(format_ngay, na=False)]
                 st.info(f"Đang lọc nhật ký ngày: **{format_ngay}**")
             if not filtered_df.empty:
-                st.dataframe(filtered_df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True)
+                # XỬ LÝ TÁCH DÒNG NHẬT KÝ THÀNH CÁC CỘT RIÊNG BIỆT
+                expanded_logs = []
+                for _, r in filtered_df.iterrows():
+                    m_lk = r["Ma_LK"]
+                    t_lk = r["Ten_LK"]
+                    kho = r.get("Kho_quan_ly", "Kho 1")
+                    raw_log = str(r.get("Nhat_ky", ""))
+                    if raw_log and raw_log != "nan":
+                        # Mỗi dòng nhật ký trong chuỗi được ngăn cách bởi dấu xuống dòng \n
+                        log_lines = raw_log.split("\n")
+                        for line in log_lines:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            # Tách định dạng chuẩn: [07/11/2026 03:29] 👤 Người - 📥 Hành động | Ghi chú...
+                            thoi_gian = ""
+                            nguoi_thuc_hien = ""
+                            hanh_dong = line
+                            ghi_chu = ""
+                            # Bóc tách thời gian trong ngoặc vuông đầu dòng [...]
+                            match_time = re.match(r'\[(.*?)\](.*)', line)
+                            if match_time:
+                                thoi_gian = match_time.group(1).strip()
+                                remaining = match_time.group(2).strip()
+                            else:
+                                remaining = line
+                            # Bóc tách người thực hiện (có icon 👤 hoặc theo gạch ngang đầu tiên)
+                            if "👤" in remaining:
+                                parts_user = remaining.split(" - ", 1)
+                                nguoi_thuc_hien = parts_user[0].replace("👤", "").strip()
+                                remaining = parts_user[1] if len(parts_user) > 1 else ""
+                            # Bóc tách ghi chú (sau dấu |)
+                            if " | " in remaining:
+                                parts_note = remaining.split(" | ", 1)
+                                hanh_dong = parts_note[0].strip()
+                                ghi_chu = parts_note[1].strip()
+                            else:
+                                hanh_dong = remaining.strip()
+                            expanded_logs.append({
+                                "Mã QR / Sản phẩm": m_lk,
+                                "Tên sản phẩm": t_lk,
+                                "Kho": kho,
+                                "Thời gian": thoi_gian,
+                                "Người thao tác": nguoi_thuc_hien,
+                                "Hành động / Sự kiện": hanh_dong,
+                                "Ghi chú chi tiết": ghi_chu
+                            })
+                if expanded_logs:
+                    df_logs_display = pd.DataFrame(expanded_logs)
+                    st.dataframe(df_logs_display, use_container_width=True, height=450)
+                else:
+                    st.warning("Không có nội dung nhật ký nào.")
             else:
                 st.warning("Không tìm thấy dữ liệu nhật ký phù hợp với bộ lọc hiện tại.")
         else:
