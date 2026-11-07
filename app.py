@@ -185,7 +185,6 @@ with main_col:
             col_pos1, col_pos2 = st.columns([1.5, 2.5])
             with col_pos1:
                 st.subheader("🔍 Chọn sản phẩm & Quét mã QR")
-                # Quét ảnh QR bằng OpenCV/PIL thay thế pyzbar để hoạt động ổn định tuyệt đối trên đám mây
                 img_qr_scan = st.file_uploader("📷 CHỤP ẢNH / TẢI ẢNH MÃ QR ĐỂ QUÉT NHANH", type=["jpg", "jpeg", "png"], key="pos_qr_img_upload")
                 scanned_from_image = None
                 if img_qr_scan is not None:
@@ -201,7 +200,6 @@ with main_col:
                                 scanned_from_image = data.strip()
                         except Exception:
                             pass
-                        # Fallback bằng pyzbar nếu có sẵn
                         if not scanned_from_image:
                             try:
                                 from pyzbar.pyzbar import decode
@@ -216,12 +214,9 @@ with main_col:
                             st.warning("⚠️ Không tìm thấy mã QR hợp lệ trong ảnh. Vui lòng chọn nhanh từ danh sách bên dưới hoặc nhập thủ công.")
                     except Exception as e:
                         st.error(f"Không thể đọc ảnh: {e}")
-                # Danh sách lựa chọn nhanh có sẵn
                 options_pos = ["-- Chọn sản phẩm từ danh sách --"] + [f"{m} - {info['Ten_LK']} (Tồn: {info['So_luong']} {info['Don_vi']} | Giá: {format_money(info['Gia_xuat'])}đ)" for m, info in all_sellable_items.items()]
                 chosen_opt_pos = st.selectbox("📦 Hoặc chọn nhanh từ danh sách có sẵn:", options_pos)
-                # Ô nhập thủ công / máy quét USB
                 scanned_code_input = st.text_input("⌨️ Hoặc dùng máy quét USB / Nhập mã thủ công:", value=scanned_from_image if scanned_from_image else "", placeholder="Bắn máy quét hoặc gõ mã...")
-                # Xác định mã sản phẩm cuối cùng được chọn từ 3 nguồn: Quét ảnh, Chọn danh sách, hoặc Nhập tay
                 final_selected_code = ""
                 if scanned_code_input.strip():
                     final_selected_code = scanned_code_input.strip()
@@ -233,7 +228,6 @@ with main_col:
                 st.subheader("📋 Thông tin chi tiết sản phẩm")
                 if final_selected_code and final_selected_code in all_sellable_items:
                     item_info = all_sellable_items[final_selected_code]
-                    # HIỂN THỊ CÁC Ô THÔNG SỐ RÕ RÀNG PHÍA DƯỚI
                     st.success(f"🎯 **ĐÃ NHẬN DIỆN THÀNH CÔNG SẢN PHẨM**")
                     col_p1, col_p2 = st.columns(2)
                     with col_p1:
@@ -468,74 +462,118 @@ with main_col:
                                     "Loai": "Linh kiện trong Combo", "Thuoc_combo": []
                                 }
                             all_linh_kien_dict[sub_m]["Thuoc_combo"].append(f"Nằm trong Combo: {m} ({t})")
-            col_sc1, col_sc2 = st.columns([2, 2])
-            with col_sc1:
-                qr_search = st.text_input("📷 Quét / Nhập mã QR để tra cứu nhanh", placeholder="Nhấn vào đây rồi quét mã QR sản phẩm...")
+            # MỘT Ô DUY NHẤT PHÍA TRÊN CHO VIỆC TÌM KIẾM / QUÉT / CHỌN NHANH
+            st.subheader("🔎 Tìm kiếm & Quét mã sản phẩm")
+            # 1. Quét ảnh QR
+            img_qr_search = st.file_uploader("📷 Chụp ảnh / Tải ảnh mã QR để tra cứu nhanh", type=["jpg", "jpeg", "png"], key="search_qr_img_upload")
+            scanned_search_code = None
+            if img_qr_search is not None:
+                try:
+                    image_pil = Image.open(img_qr_search)
+                    try:
+                        import cv2
+                        import numpy as np
+                        opencv_image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+                        detector = cv2.QRCodeDetector()
+                        data, bbox, _ = detector.detectAndDecode(opencv_image)
+                        if data:
+                            scanned_search_code = data.strip()
+                    except Exception:
+                        pass
+                    if not scanned_search_code:
+                        try:
+                            from pyzbar.pyzbar import decode
+                            decoded_objects = decode(image_pil)
+                            if decoded_objects:
+                                scanned_search_code = decoded_objects[0].data.decode('utf-8').strip()
+                        except Exception:
+                            pass
+                    if scanned_search_code:
+                        st.success(f"✨ Nhận diện mã từ ảnh: `{scanned_search_code}`")
+                except Exception as e:
+                    st.error(f"Không thể đọc ảnh: {e}")
+            # 2. Chọn nhanh từ danh sách có sẵn (Gộp cả Combo và Linh kiện)
+            all_combined_options = ["-- Hoặc chọn sản phẩm từ danh sách --"]
+            for m_key, c_info in combo_dict_tc.items():
+                all_combined_options.append(f"[Combo] {m_key} - {c_info['Ten_LK']} (Kho: {c_info['Kho_quan_ly']} | Tồn: {c_info['So_luong']} {c_info['Don_vi']})")
+            for m_key, l_info in all_linh_kien_dict.items():
+                all_combined_options.append(f"[Linh kiện] {m_key} - {l_info['Ten_LK']} (Kho: {l_info['Kho_quan_ly']} | Tồn: {l_info['So_luong']} {l_info['Don_vi']})")
+            chosen_search_opt = st.selectbox("📦 Chọn sản phẩm từ danh sách có sẵn:", all_combined_options)
+            # 3. Nhập mã thủ công / máy quét USB
+            manual_search_input = st.text_input("⌨️ Hoặc dùng máy quét USB / Nhập mã thủ công:", value=scanned_search_code if scanned_search_code else "", placeholder="Gõ mã hoặc bắn máy quét...")
+            # Xác định mã sản phẩm cuối cùng được chọn từ 3 nguồn trên
+            final_search_code = ""
+            if manual_search_input.strip():
+                final_search_code = manual_search_input.strip()
+            elif scanned_search_code:
+                final_search_code = scanned_search_code
+            elif chosen_search_opt and not chosen_search_opt.startswith("--"):
+                # Cắt lấy phần mã bên trong dấu ngoặc hoặc trước dấu cách
+                parts_opt = chosen_search_opt.split(" - ")
+                raw_code_part = parts_opt[0]
+                final_search_code = raw_code_part.split("] ")[-1].strip()
             target_item_info = None
-            if qr_search.strip():
-                clean_q = qr_search.strip()
-                if clean_q in combo_dict_tc:
-                    target_item_info = combo_dict_tc[clean_q]
-                    st.success(f"✨ Đã nhận diện Combo qua mã QR: **{target_item_info['Ten_LK']}** (`{clean_q}`)")
-                elif clean_q in all_linh_kien_dict:
-                    target_item_info = all_linh_kien_dict[clean_q]
-                    st.success(f"✨ Đã nhận diện Linh kiện qua mã QR: **{target_item_info['Ten_LK']}** (`{clean_q}`)")
-                else:
-                    st.warning("⚠️ Không tìm thấy sản phẩm nào khớp với mã QR này.")
-            col_f_chon, col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2, 1.5])
-            with col_f_chon:
-                che_do_xem = st.radio("Loại tìm kiếm:", ["📦 Tìm Combo", "🔩 Tìm Linh kiện lẻ"], horizontal=True)
-            with col_f1:
-                loai_loc = st.selectbox("Hạng mục hoạt động", ["Tất cả", "📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"])
-            with col_f2:
-                if "📦" in che_do_xem:
-                    cb_list = list(combo_dict_tc.keys())
-                    default_cb_idx = cb_list.index(target_item_info["Ma_LK"]) if target_item_info and target_item_info["Ma_LK"] in cb_list else 0
-                    selected_code = st.selectbox("Chọn mã Combo", cb_list, index=default_cb_idx) if cb_list else None
-                    current_detail = combo_dict_tc.get(selected_code, {}) if selected_code else {}
-                else:
-                    lk_list = list(all_linh_kien_dict.keys())
-                    default_lk_idx = lk_list.index(target_item_info["Ma_LK"]) if target_item_info and target_item_info["Ma_LK"] in lk_list else 0
-                    selected_code = st.selectbox("Chọn mã linh kiện lẻ", lk_list, index=default_lk_idx) if lk_list else None
-                    current_detail = all_linh_kien_dict.get(selected_code, {}) if selected_code else {}
-            with col_f3:
-                bat_tat_ngay = st.checkbox("Lọc theo ngày")
-                ngay_chon = st.date_input("Chọn ngày", value=date.today())
-            if current_detail:
-                st.markdown("### 📄 Thông tin chi tiết & Mã QR Sản Phẩm")
+            is_combo_target = False
+            if final_search_code:
+                if final_search_code in combo_dict_tc:
+                    target_item_info = combo_dict_tc[final_search_code]
+                    is_combo_target = True
+                elif final_search_code in all_linh_kien_dict:
+                    target_item_info = all_linh_kien_dict[final_search_code]
+                    is_combo_target = False
+            if target_item_info:
+                st.markdown("---")
+                st.markdown("### 📄 THÔNG TIN CHI TIẾT & MÃ QR SẢN PHẨM")
                 col_info1, col_info_qr = st.columns([2, 1.5])
                 with col_info1:
-                    st.write(f"**Mã QR:** `{current_detail.get('Ma_LK', '')}`")
-                    st.write(f"**Tên sản phẩm:** {current_detail.get('Ten_LK', '')}")
-                    st.write(f"**🏢 Kho quản lý:** {current_detail.get('Kho_quan_ly', 'Kho 1')}")
-                    st.write(f"**📦 Tồn kho:** {current_detail.get('So_luong', 0)} {current_detail.get('Don_vi', 'Cái')}")
-                    if "📦" in che_do_xem:
-                        st.write(f"**Quy cách:** 1 Kiện = {current_detail.get('Quy_cach', 1)} {current_detail.get('Don_vi', 'Bộ')}")
-                    st.write(f"**💰 Giá nhập:** {format_money(current_detail.get('Gia_nhap', 0))} VNĐ")
-                    if current_detail.get('Gia_xuat', 0) > 0:
-                        st.write(f"**🏷️ Giá xuất:** {format_money(current_detail.get('Gia_xuat', 0))} VNĐ")
-                    if "🔩" in che_do_xem:
-                        thuoc_cb = current_detail.get('Thuoc_combo', [])
-                        st.markdown("**🔗 Phân bổ trong hệ thống:**")
-                        for tc in thuoc_cb:
-                            st.write(f"- {tc}")
-                    tp_hien_thi = current_detail.get('Thanh_phan', [])
-                    if tp_hien_thi and isinstance(tp_hien_thi, list):
-                        st.markdown("**🔗 Các linh kiện thành phần trong bộ Combo:**")
-                        for tp in tp_hien_thi:
-                            st.write(f"- `{tp.get('ma')}` ({tp.get('ten')}) | Định mức: **{tp.get('sl')} {tp.get('dv', 'Cái')}**")
+                    st.info(f"""
+- 🏷️ **Tên sản phẩm:** **{target_item_info.get('Ten_LK', '')}**
+- 🔑 **Mã QR / Code:** `{target_item_info.get('Ma_LK', '')}`
+- 🏢 **Kho quản lý:** **{target_item_info.get('Kho_quan_ly', 'Kho 1')}**
+- 📦 **Số lượng tồn kho:** **{target_item_info.get('So_luong', 0)} {target_item_info.get('Don_vi', 'Cái')}**
+- 💰 **Giá nhập:** **{format_money(target_item_info.get('Gia_nhap', 0))} VNĐ**
+- 🏷️ **Giá xuất:** **{format_money(target_item_info.get('Gia_xuat', 0))} VNĐ**
+                    """)
+                    if is_combo_target:
+                        st.write(f"**Quy cách:** 1 Kiện = {target_item_info.get('Quy_cach', 1)} {target_item_info.get('Don_vi', 'Bộ')}")
+                        tp_hien_thi = target_item_info.get('Thanh_phan', [])
+                        if tp_hien_thi and isinstance(tp_hien_thi, list):
+                            st.markdown("**🔗 Các linh kiện thành phần trong bộ Combo:**")
+                            for tp in tp_hien_thi:
+                                st.write(f"- `{tp.get('ma')}` ({tp.get('ten')}) | Định mức: **{tp.get('sl')} {tp.get('dv', 'Cái')}**")
                 with col_info_qr:
                     st.markdown("📱 **Mã QR Sản Phẩm:**")
-                    qr_bytes = generate_qr_image(str(current_detail.get('Ma_LK', '')))
-                    st.image(qr_bytes, caption=f"Mã QR: {current_detail.get('Ma_LK', '')}", width=200)
+                    qr_bytes = generate_qr_image(str(target_item_info.get('Ma_LK', '')))
+                    st.image(qr_bytes, caption=f"Mã QR: {target_item_info.get('Ma_LK', '')}", width=180)
                     st.download_button(
                         label="📥 Tải ảnh QR Code",
                         data=qr_bytes,
-                        file_name=f"QR_{current_detail.get('Ma_LK', 'code')}.png",
+                        file_name=f"QR_{target_item_info.get('Ma_LK', 'code')}.png",
                         mime="image/png"
                     )
+            st.markdown("---")
             st.markdown("### 📋 NHẬT KÝ KHO")
+            # BỘ LỌC NHẬT KÝ THEO KHO HOẶC TỔNG KHO
+            col_nk1, col_nk2, col_nk3 = st.columns([1.5, 1.5, 2])
+            with col_nk1:
+                chon_kho_nhat_ky = st.selectbox(
+                    "🏢 Lọc theo kho:", 
+                    ["🌐 Tất cả các kho (Tổng kho)"] + danh_sach_kho_mac_dinh,
+                    key="log_warehouse_filter"
+                )
+            with col_nk2:
+                loai_loc = st.selectbox("Hạng mục hoạt động", ["Tất cả", "📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"])
+            with col_nk3:
+                bat_tat_ngay = st.checkbox("Lọc theo ngày")
+                ngay_chon = st.date_input("Chọn ngày", value=date.today())
             filtered_df = df.copy()
+            # Lọc theo kho nhật ký
+            if chon_kho_nhat_ky != "🌐 Tất cả các kho (Tổng kho)":
+                filtered_df = filtered_df[filtered_df["Kho_quan_ly"] == chon_kho_nhat_ky]
+            # Lọc theo sản phẩm được chọn
+            if final_search_code:
+                filtered_df = filtered_df[filtered_df["Ma_LK"] == final_search_code]
+            # Lọc theo loại hoạt động
             if loai_loc != "Tất cả":
                 keyword_map = {
                     "📥 Nhập kho": "Nhập kho",
@@ -544,16 +582,15 @@ with main_col:
                 }
                 kw = keyword_map.get(loai_loc, "")
                 filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(kw, na=False)]
-            if selected_code:
-                filtered_df = filtered_df[filtered_df["Ma_LK"] == selected_code]
+            # Lọc theo ngày
             if bat_tat_ngay:
                 format_ngay = ngay_chon.strftime("%d/%m/%Y")
                 filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(format_ngay, na=False)]
-                st.info(f"Đang lọc ngày: **{format_ngay}**")
+                st.info(f"Đang lọc nhật ký ngày: **{format_ngay}**")
             if not filtered_df.empty:
                 st.dataframe(filtered_df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True)
             else:
-                st.warning("Không tìm thấy dữ liệu nhật ký phù hợp cho sản phẩm này.")
+                st.warning("Không tìm thấy dữ liệu nhật ký phù hợp với bộ lọc hiện tại.")
         else:
             st.info("Kho hiện đang trống.")
     # 3. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO
@@ -779,7 +816,7 @@ with main_col:
             else:
                 ma_lk = st.text_input("Mã QR Combo (Tự viết)", value=auto_cb_code, key="new_cb_manualcode")
             kho_nhap_cb = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, key="new_cb_kho")
-            don_vi = st.selectbox("Don vị tính cơ bản của Combo", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
+            don_vi = st.selectbox("Đơn vị tính cơ bản của Combo", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
             hinh_thuc_nhap_cb = st.radio(
                 "Hình thức nhập kho:",
                 ["📐 Nhập theo đơn vị lẻ", "📦 Nhập theo Kiện (Thùng)"],
@@ -808,7 +845,6 @@ with main_col:
             if uploaded_phieu_cb is not None:
                 img_phieu_nhap_cb = f"local_file_{uploaded_phieu_cb.name}"
                 st.image(uploaded_phieu_cb, width=120)
-        # KIỂM TRA TRÙNG TOÀN HỆ THỐNG
         is_duplicate_cb = False
         duplicate_msg_cb = ""
         if not df.empty:
@@ -1102,7 +1138,6 @@ with main_col:
             if uploaded_phieu_lk_moi is not None:
                 img_phieu_lk_moi = f"local_file_{uploaded_phieu_lk_moi.name}"
                 st.image(uploaded_phieu_lk_moi, width=120)
-        # KIỂM TRA TRÙNG TOÀN HỆ THỐNG
         is_duplicate_lk = False
         duplicate_msg_lk = ""
         if not df.empty:
