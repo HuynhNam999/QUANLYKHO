@@ -171,7 +171,7 @@ with main_col:
         if not df.empty:
             all_sellable_items = {}
             for _, r in df.iterrows():
-                m = r["Ma_LK"]
+                m = str(r["Ma_LK"]).strip()
                 t = r["Ten_LK"]
                 kho = r.get("Kho_quan_ly", "Kho 1")
                 sl = r["So_luong"]
@@ -184,75 +184,89 @@ with main_col:
                 }
             col_pos1, col_pos2 = st.columns([1.5, 2.5])
             with col_pos1:
-                st.subheader("🔍 Chọn sản phẩm & Quét mã")
-                # Quét ảnh QR an toàn tuyệt đối bằng pyzbar
+                st.subheader("🔍 Chọn sản phẩm & Quét mã QR")
+                # Quét ảnh QR bằng OpenCV/PIL thay thế pyzbar để hoạt động ổn định tuyệt đối trên đám mây
                 img_qr_scan = st.file_uploader("📷 CHỤP ẢNH / TẢI ẢNH MÃ QR ĐỂ QUÉT NHANH", type=["jpg", "jpeg", "png"], key="pos_qr_img_upload")
                 scanned_from_image = None
                 if img_qr_scan is not None:
                     try:
                         image_pil = Image.open(img_qr_scan)
                         try:
-                            from pyzbar.pyzbar import decode
-                            decoded_objects = decode(image_pil)
-                            if decoded_objects:
-                                scanned_from_image = decoded_objects[0].data.decode('utf-8').strip()
+                            import cv2
+                            import numpy as np
+                            opencv_image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+                            detector = cv2.QRCodeDetector()
+                            data, bbox, _ = detector.detectAndDecode(opencv_image)
+                            if data:
+                                scanned_from_image = data.strip()
                         except Exception:
                             pass
+                        # Fallback bằng pyzbar nếu có sẵn
+                        if not scanned_from_image:
+                            try:
+                                from pyzbar.pyzbar import decode
+                                decoded_objects = decode(image_pil)
+                                if decoded_objects:
+                                    scanned_from_image = decoded_objects[0].data.decode('utf-8').strip()
+                            except Exception:
+                                pass
                         if scanned_from_image:
                             st.success(f"✨ Quét thành công mã từ ảnh: `{scanned_from_image}`")
                         else:
-                            st.info("💡 Đã tải ảnh lên. Nếu ảnh không tự nhận diện được mã QR, bạn hãy nhập mã thủ công vào ô bên dưới.")
+                            st.warning("⚠️ Không tìm thấy mã QR hợp lệ trong ảnh. Vui lòng chọn nhanh từ danh sách bên dưới hoặc nhập thủ công.")
                     except Exception as e:
                         st.error(f"Không thể đọc ảnh: {e}")
+                # Danh sách lựa chọn nhanh có sẵn
+                options_pos = ["-- Chọn sản phẩm từ danh sách --"] + [f"{m} - {info['Ten_LK']} (Tồn: {info['So_luong']} {info['Don_vi']} | Giá: {format_money(info['Gia_xuat'])}đ)" for m, info in all_sellable_items.items()]
+                chosen_opt_pos = st.selectbox("📦 Hoặc chọn nhanh từ danh sách có sẵn:", options_pos)
+                # Ô nhập thủ công / máy quét USB
                 scanned_code_input = st.text_input("⌨️ Hoặc dùng máy quét USB / Nhập mã thủ công:", value=scanned_from_image if scanned_from_image else "", placeholder="Bắn máy quét hoặc gõ mã...")
-                selected_code_pos = None
-                active_scan_code = scanned_code_input.strip()
-                if active_scan_code:
-                    if active_scan_code in all_sellable_items:
-                        selected_code_pos = active_scan_code
-                        # Hiển thị trực quan thông tin sản phẩm vừa quét ngay bên dưới
-                        scanned_info = all_sellable_items[active_scan_code]
-                        st.success(f"🎯 **ĐÃ TÌM THẤY SẢN PHẨM QUA MÃ QUÉT:**")
-                        st.markdown(f"""
-                        - 🏷️ **Tên sản phẩm:** `{scanned_info['Ten_LK']}`
-                        - 🏢 **Đang ở kho:** `{scanned_info['Kho_quan_ly']}`
-                        - 📦 **Số lượng tồn:** `{scanned_info['So_luong']} {scanned_info['Don_vi']}`
-                        - 💰 **Giá bán:** `{format_money(scanned_info['Gia_xuat'])} VNĐ / {scanned_info['Don_vi']}`
-                        """)
-                    else:
-                        st.warning(f"⚠️ Mã `{active_scan_code}` không tồn tại trong kho bán hàng.")
-                options_pos = [f"{m} - {info['Ten_LK']} (Tồn: {info['So_luong']} {info['Don_vi']} | Giá: {format_money(info['Gia_xuat'])}đ)" for m, info in all_sellable_items.items()]
-                default_pos_idx = 0
-                if selected_code_pos:
-                    for idx, opt in enumerate(options_pos):
-                        if opt.startswith(selected_code_pos):
-                            default_pos_idx = idx
-                            break
-                chosen_opt_pos = st.selectbox("📦 Hoặc chọn nhanh từ danh sách:", options_pos, index=default_pos_idx)
-                chosen_m_pos = chosen_opt_pos.split(" - ")[0]
-                item_info = all_sellable_items[chosen_m_pos]
-                st.write(f"**Giá bán:** `{format_money(item_info['Gia_xuat'])} VNĐ / {item_info['Don_vi']}`")
-                st.write(f"**Tồn kho hiện tại:** `{item_info['So_luong']} {item_info['Don_vi']}` (Kho: {item_info['Kho_quan_ly']})")
-                sl_mua = st.number_input("Số lượng mua", min_value=1, max_value=max(1, int(item_info['So_luong'])), step=1, value=1)
-                if st.button("➕ Thêm vào giỏ hàng", type="primary"):
-                    found_in_cart = False
-                    for cart_item in st.session_state.cart:
-                        if cart_item["Ma_LK"] == chosen_m_pos:
-                            cart_item["So_luong_mua"] += sl_mua
-                            found_in_cart = True
-                            break
-                    if not found_in_cart:
-                        st.session_state.cart.append({
-                            "Ma_LK": chosen_m_pos,
-                            "Ten_LK": item_info["Ten_LK"],
-                            "Kho_quan_ly": item_info["Kho_quan_ly"],
-                            "Don_vi": item_info["Don_vi"],
-                            "Gia_xuat": item_info["Gia_xuat"],
-                            "So_luong_mua": sl_mua,
-                            "Thanh_phan": item_info["Thanh_phan"]
-                        })
-                    st.success("Đã thêm vào giỏ hàng!")
-                    st.rerun()
+                # Xác định mã sản phẩm cuối cùng được chọn từ 3 nguồn: Quét ảnh, Chọn danh sách, hoặc Nhập tay
+                final_selected_code = ""
+                if scanned_code_input.strip():
+                    final_selected_code = scanned_code_input.strip()
+                elif scanned_from_image:
+                    final_selected_code = scanned_from_image
+                elif chosen_opt_pos and not chosen_opt_pos.startswith("--"):
+                    final_selected_code = chosen_opt_pos.split(" - ")[0]
+                st.markdown("---")
+                st.subheader("📋 Thông tin chi tiết sản phẩm")
+                if final_selected_code and final_selected_code in all_sellable_items:
+                    item_info = all_sellable_items[final_selected_code]
+                    # HIỂN THỊ CÁC Ô THÔNG SỐ RÕ RÀNG PHÍA DƯỚI
+                    st.success(f"🎯 **ĐÃ NHẬN DIỆN THÀNH CÔNG SẢN PHẨM**")
+                    col_p1, col_p2 = st.columns(2)
+                    with col_p1:
+                        st.info(f"🏷️ **Tên sản phẩm:**\n\n**{item_info['Ten_LK']}**")
+                        st.info(f"🏢 **Kho đang chứa:**\n\n**{item_info['Kho_quan_ly']}**")
+                    with col_p2:
+                        st.info(f"📦 **Số lượng tồn kho:**\n\n**{item_info['So_luong']} {item_info['Don_vi']}**")
+                        st.info(f"💰 **Giá bán:**\n\n**{format_money(item_info['Gia_xuat'])} VNĐ / {item_info['Don_vi']}**")
+                    st.markdown("")
+                    sl_mua = st.number_input("Số lượng mua", min_value=1, max_value=max(1, int(item_info['So_luong'])), step=1, value=1)
+                    if st.button("➕ Thêm vào giỏ hàng", type="primary"):
+                        found_in_cart = False
+                        for cart_item in st.session_state.cart:
+                            if cart_item["Ma_LK"] == final_selected_code:
+                                cart_item["So_luong_mua"] += sl_mua
+                                found_in_cart = True
+                                break
+                        if not found_in_cart:
+                            st.session_state.cart.append({
+                                "Ma_LK": final_selected_code,
+                                "Ten_LK": item_info["Ten_LK"],
+                                "Kho_quan_ly": item_info["Kho_quan_ly"],
+                                "Don_vi": item_info["Don_vi"],
+                                "Gia_xuat": item_info["Gia_xuat"],
+                                "So_luong_mua": sl_mua,
+                                "Thanh_phan": item_info["Thanh_phan"]
+                            })
+                        st.success("Đã thêm vào giỏ hàng!")
+                        st.rerun()
+                elif final_selected_code:
+                    st.warning(f"⚠️ Mã sản phẩm `{final_selected_code}` không tồn tại trong hệ thống kho bán hàng.")
+                else:
+                    st.info("💡 Vui lòng quét ảnh QR, chọn sản phẩm từ danh sách hoặc nhập mã để xem thông tin chi tiết.")
             with col_pos2:
                 st.subheader("🛒 Giỏ hàng hiện tại")
                 if st.session_state.cart:
@@ -412,7 +426,7 @@ with main_col:
             all_linh_kien_dict = {}
             combo_dict_tc = {}
             for _, r in df.iterrows():
-                m = r["Ma_LK"]
+                m = str(r["Ma_LK"]).strip()
                 t = r["Ten_LK"]
                 kho = r.get("Kho_quan_ly", "Kho 1")
                 dv = r["Don_vi"]
@@ -765,7 +779,7 @@ with main_col:
             else:
                 ma_lk = st.text_input("Mã QR Combo (Tự viết)", value=auto_cb_code, key="new_cb_manualcode")
             kho_nhap_cb = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, key="new_cb_kho")
-            don_vi = st.selectbox("Đơn vị tính cơ bản của Combo", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
+            don_vi = st.selectbox("Don vị tính cơ bản của Combo", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
             hinh_thuc_nhap_cb = st.radio(
                 "Hình thức nhập kho:",
                 ["📐 Nhập theo đơn vị lẻ", "📦 Nhập theo Kiện (Thùng)"],
@@ -1150,7 +1164,7 @@ with main_col:
         all_items_dict = {}
         if not df.empty:
             for _, r in df.iterrows():
-                m = r["Ma_LK"]
+                m = str(r["Ma_LK"]).strip()
                 t = r["Ten_LK"]
                 kho = r["Kho_quan_ly"] if "Kho_quan_ly" in r and pd.notna(r["Kho_quan_ly"]) else "Kho 1"
                 dv = r["Don_vi"]
@@ -1169,7 +1183,7 @@ with main_col:
                         }
                 if tp and isinstance(tp, list):
                     for sub_item in tp:
-                        sub_m = sub_item.get("ma")
+                        sub_m = str(sub_item.get("ma")).strip()
                         sub_t = sub_item.get("ten", "Linh kiện")
                         sub_dv = sub_item.get("dv", "Cái")
                         sub_gia = float(sub_item.get("gia", 0)) if pd.notna(sub_item.get("gia")) else 0
@@ -1329,7 +1343,7 @@ with main_col:
                 if cb_tp and isinstance(cb_tp, list) and len(cb_tp) > 0:
                     st.markdown("### 🔗 Các linh kiện con sẽ được cộng vào kho khi xé lẻ:")
                     for tp in cb_tp:
-                        sub_m = tp.get('ma')
+                        sub_m = str(tp.get('ma')).strip()
                         sub_name = tp.get('ten', 'Linh kiện')
                         sub_dinh_muc = int(tp.get('sl', 1))
                         sub_dv_con = tp.get('dv', 'Cái')
@@ -1354,7 +1368,7 @@ with main_col:
                                     "Nhat_ky": cb_log_moi
                                 }).eq("Ma_LK", selected_cb_ma).execute()
                                 for tp in cb_tp:
-                                    sub_m = tp.get('ma')
+                                    sub_m = str(tp.get('ma')).strip()
                                     sub_sl_tang = int(tp.get('sl', 1)) * int(so_luong_xe)
                                     sub_name_con = tp.get('ten', 'Linh kiện')
                                     sub_dv_con = tp.get('dv', 'Cái')
@@ -1442,7 +1456,7 @@ with main_col:
                 if thanh_phan_list and isinstance(thanh_phan_list, list) and len(thanh_phan_list) > 0:
                     st.info("🔗 **Các linh kiện/vật tư con bên trong sẽ được trừ tự động theo định mức:**")
                     for tp in thanh_phan_list:
-                        sub_m = tp.get('ma')
+                        sub_m = str(tp.get('ma')).strip()
                         sub_name = tp.get('ten', 'Linh kiện')
                         sub_sl = tp.get('sl')
                         sub_dv = tp.get('dv', 'Cái')
@@ -1493,7 +1507,7 @@ with main_col:
                             supabase.table("Ton_kho").upsert(update_data).execute()
                             if thanh_phan_list and isinstance(thanh_phan_list, list):
                                 for tp in thanh_phan_list:
-                                    sub_ma = tp.get('ma')
+                                    sub_ma = str(tp.get('ma')).strip()
                                     sub_sl_can_dung = int(tp.get('sl')) * int(so_luong_xuat)
                                     sub_row_df = df[df["Ma_LK"] == sub_ma]
                                     if not sub_row_df.empty:
@@ -1523,7 +1537,7 @@ with main_col:
         if not df.empty:
             all_items_dict = {}
             for _, row in df.iterrows():
-                m = row["Ma_LK"]
+                m = str(row["Ma_LK"]).strip()
                 t = row["Ten_LK"]
                 kho = row.get("Kho_quan_ly", "Kho 1")
                 dv = row["Don_vi"]
@@ -1536,7 +1550,7 @@ with main_col:
                 tp_list = row.get("Thanh_phan", [])
                 if tp_list and isinstance(tp_list, list):
                     for tp in tp_list:
-                        sub_m = tp.get("ma")
+                        sub_m = str(tp.get("ma")).strip()
                         sub_name = tp.get("ten", "Linh kiện")
                         sub_dv = tp.get("dv", "Cái")
                         if sub_m and not sub_m.startswith(("CB", "CM")) and sub_m not in all_items_dict:
@@ -1641,7 +1655,7 @@ with main_col:
                                 cb_tp_list = combo_row.get("Thanh_phan", [])
                                 if cb_tp_list and isinstance(cb_tp_list, list):
                                     for tp in cb_tp_list:
-                                        if tp.get("ma") == selected_export_item:
+                                        if str(tp.get("ma")).strip() == selected_export_item:
                                             dinh_muc = int(tp.get("sl", 1))
                                             so_bo_giam = so_luong_xuat // dinh_muc
                                             if so_bo_giam > 0:
@@ -1676,4 +1690,3 @@ with main_col:
                 df_ton_kho = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach"]].copy()
                 df_ton_kho.columns = ["Mã QR Sản Phẩm / Combo", "Tên Sản Phẩm", "Kho Quản Lý", "Số Lượng Tồn Kho", "Đơn Vị Tính", "Quy Cách (SL/Kiện)"]
                 df_ton_kho.to_excel(writer, sheet_name='Ton_Kho_Hien_Tai', index=False)
-Names = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Nhat_ky"]].copy()
