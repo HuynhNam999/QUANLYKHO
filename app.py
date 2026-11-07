@@ -222,7 +222,7 @@ with main_col:
                 st.dataframe(df_display, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm sản phẩm mới!")
-    # 2. TRA CỨU & LỌC CHI TIẾT (ĐÃ FIX HIỂN THỊ ẢNH)
+    # 2. TRA CỨU & LỌC CHI TIẾT
     elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
         st.title("🔍 TRA CỨU & LỌC CHI TIẾT SẢN PHẨM")
         st.markdown("---")
@@ -907,23 +907,79 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện/vật tư!")
-    # 7. NHẬP LINH KIỆN CŨ (CÓ DROPDOWN CHỌN VÀ NÚT LOAD DỮ LIỆU CŨ CHUẨN XÁC)
+    # 7. NHẬP LINH KIỆN CŨ (QUÉT TOÀN DIỆN CẢ ĐỘC LẬP LẪN THÀNH PHẦN COMBO)
     elif menu_choice == "📥 Nhập linh kiện cũ":
         st.title("🔩 NHẬP BỔ SUNG LINH KIỆN / VẬT TƯ CŨ")
         render_code_guide()
         st.markdown("---")
         if "selected_lk_nhap_cu" not in st.session_state:
             st.session_state.selected_lk_nhap_cu = ""
-        item_dict_le_cu = {}
+        all_items_dict = {}
         if not df.empty:
-            df_le_only = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)].copy()
-            for _, r in df_le_only.iterrows():
-                m_code = r["Ma_LK"]
-                t_name = r["Ten_LK"]
-                kho_ql = r.get("Kho_quan_ly", "Kho 1")
-                display_str = f"{m_code} - {t_name} (Kho: {kho_ql} | Tồn: {r['So_luong']})"
-                if display_str not in item_dict_le_cu:
-                    item_dict_le_cu[display_str] = r.to_dict()
+            for _, r in df.iterrows():
+                m = r["Ma_LK"]
+                t = r["Ten_LK"]
+                kho = r.get("Kho_quan_ly", "Kho 1")
+                dv = r["Don_vi"]
+                sl = r["So_luong"]
+                img = r.get("Hinh_anh", "")
+                qc = int(r.get("Quy_cach", 1)) if pd.notna(r.get("Quy_cach")) else 1
+                gn = float(r.get("Gia_nhap", 0)) if pd.notna(r.get("Gia_nhap")) else 0
+                gx = float(r.get("Gia_xuat", 0)) if pd.notna(r.get("Gia_xuat")) else 0
+                bc = r.get("Barcode", "")
+                tp = r.get("Thanh_phan", [])
+                if not m.startswith(("CB", "CM")):
+                    if m not in all_items_dict:
+                        all_items_dict[m] = {
+                            "Ma_LK": m, "Ten_LK": t, "Kho_quan_ly": kho, 
+                            "So_luong": sl, "Don_vi": dv, "Hinh_anh": img, 
+                            "Quy_cach": qc, "Gia_nhap": gn, "Gia_xuat": gx, 
+                            "Barcode": bc, "Thanh_phan": []
+                        }
+                if tp and isinstance(tp, list):
+                    for sub_item in tp:
+                        sub_m = sub_item.get("ma")
+                        sub_t = sub_item.get("ten", "Linh kiện")
+                        sub_dv = sub_item.get("dv", "Cái")
+                        sub_gia = float(sub_item.get("gia", 0)) if pd.notna(sub_item.get("gia")) else 0
+                        sub_img = sub_item.get("img", "")
+                        sub_bc = sub_item.get("barcode", "")
+                        if sub_m and sub_m not in all_items_dict:
+                            sub_match_db = df[df["Ma_LK"] == sub_m]
+                            if not sub_match_db.empty:
+                                db_row = sub_match_db.iloc[0]
+                                all_items_dict[sub_m] = {
+                                    "Ma_LK": sub_m,
+                                    "Ten_LK": db_row["Ten_LK"],
+                                    "Kho_quan_ly": db_row.get("Kho_quan_ly", kho),
+                                    "So_luong": db_row["So_luong"],
+                                    "Don_vi": db_row["Don_vi"],
+                                    "Hinh_anh": db_row.get("Hinh_anh", sub_img),
+                                    "Quy_cach": int(db_row.get("Quy_cach", 1)),
+                                    "Gia_nhap": float(db_row.get("Gia_nhap", sub_gia)),
+                                    "Gia_xuat": float(db_row.get("Gia_xuat", 0)),
+                                    "Barcode": db_row.get("Barcode", sub_bc),
+                                    "Thanh_phan": db_row.get("Thanh_phan", [])
+                                }
+                            else:
+                                all_items_dict[sub_m] = {
+                                    "Ma_LK": sub_m,
+                                    "Ten_LK": sub_t,
+                                    "Kho_quan_ly": kho,
+                                    "So_luong": 0,
+                                    "Don_vi": sub_dv,
+                                    "Hinh_anh": sub_img,
+                                    "Quy_cach": 1,
+                                    "Gia_nhap": sub_gia,
+                                    "Gia_xuat": 0,
+                                    "Barcode": sub_bc,
+                                    "Thanh_phan": []
+                                }
+        item_dict_le_cu = {}
+        for m, info in all_items_dict.items():
+            if not m.startswith(("CB", "CM")):
+                display_str = f"{m} - {info['Ten_LK']} (Kho: {info['Kho_quan_ly']} | Tồn: {info['So_luong']})"
+                item_dict_le_cu[display_str] = info
         if item_dict_le_cu:
             col_lk_load1, col_lk_load2 = st.columns([3, 1])
             with col_lk_load1:
@@ -937,35 +993,31 @@ with main_col:
                 st.write("")
                 if st.button("📥 Nạp dữ liệu cũ lên Form", type="secondary", key="btn_load_lk_cu"):
                     st.session_state.selected_lk_nhap_cu = chosen_lk_cu_str.split(" - ")[0]
-                    matched_lc_load = df[df["Ma_LK"] == st.session_state.selected_lk_nhap_cu]
-                    if not matched_lc_load.empty:
-                        row_lc = matched_lc_load.iloc[0]
-                        st.session_state.lc_ten = row_lc.get("Ten_LK", "")
-                        st.session_state.lc_kho = row_lc.get("Kho_quan_ly", "Kho 1")
-                        st.session_state.lc_dv = row_lc.get("Don_vi", "Cái")
-                        st.session_state.lc_qc = int(row_lc.get("Quy_cach", 1)) if pd.notna(row_lc.get("Quy_cach")) else 1
-                        st.session_state.lc_gn = int(row_lc.get("Gia_nhap", 0)) if pd.notna(row_lc.get("Gia_nhap")) else 0
-                        st.session_state.lc_gx = int(row_lc.get("Gia_xuat", 0)) if pd.notna(row_lc.get("Gia_xuat")) else 0
-                        st.session_state.lc_bc = row_lc.get("Barcode", "") if row_lc.get("Barcode") else ""
-                        st.session_state.lc_img = row_lc.get("Hinh_anh", "")
-                        st.session_state.lc_tp = row_lc.get("Thanh_phan", [])
+                    selected_info = item_dict_le_cu[chosen_lk_cu_str]
+                    st.session_state.lc_ten = selected_info.get("Ten_LK", "")
+                    st.session_state.lc_kho = selected_info.get("Kho_quan_ly", "Kho 1")
+                    st.session_state.lc_dv = selected_info.get("Don_vi", "Cái")
+                    st.session_state.lc_qc = int(selected_info.get("Quy_cach", 1))
+                    st.session_state.lc_gn = float(selected_info.get("Gia_nhap", 0))
+                    st.session_state.lc_gx = float(selected_info.get("Gia_xuat", 0))
+                    st.session_state.lc_bc = selected_info.get("Barcode", "")
+                    st.session_state.lc_img = selected_info.get("Hinh_anh", "")
+                    st.session_state.lc_tp = selected_info.get("Thanh_phan", [])
                     st.success(f"Đã nạp dữ liệu linh kiện `{st.session_state.selected_lk_nhap_cu}` lên form!")
                     st.rerun()
         else:
             st.warning("Chưa có linh kiện lẻ nào trong hệ thống!")
         target_lc_code = st.session_state.selected_lk_nhap_cu
         active_lc_data = {}
-        if target_lc_code and not df.empty:
-            m_lc = df[df["Ma_LK"] == target_lc_code]
-            if not m_lc.empty:
-                active_lc_data = m_lc.iloc[0].to_dict()
+        if target_lc_code and target_lc_code in all_items_dict:
+            active_lc_data = all_items_dict[target_lc_code]
         def_lc_ten = st.session_state.get("lc_ten", active_lc_data.get("Ten_LK", ""))
         def_lc_kho = st.session_state.get("lc_kho", active_lc_data.get("Kho_quan_ly", "Kho 1"))
         def_lc_dv = st.session_state.get("lc_dv", active_lc_data.get("Don_vi", "Cái"))
-        def_lc_qc = st.session_state.get("lc_qc", int(active_lc_data.get("Quy_cach", 1)) if pd.notna(active_lc_data.get("Quy_cach")) else 1)
-        def_lc_gn = st.session_state.get("lc_gn", int(active_lc_data.get("Gia_nhap", 0)) if pd.notna(active_lc_data.get("Gia_nhap")) else 0)
-        def_lc_gx = st.session_state.get("lc_gx", int(active_lc_data.get("Gia_xuat", 0)) if pd.notna(active_lc_data.get("Gia_xuat")) else 0)
-        def_lc_bc = st.session_state.get("lc_bc", active_lc_data.get("Barcode", "") if active_lc_data.get("Barcode") else "")
+        def_lc_qc = st.session_state.get("lc_qc", int(active_lc_data.get("Quy_cach", 1)))
+        def_lc_gn = st.session_state.get("lc_gn", float(active_lc_data.get("Gia_nhap", 0)))
+        def_lc_gx = st.session_state.get("lc_gx", float(active_lc_data.get("Gia_xuat", 0)))
+        def_lc_bc = st.session_state.get("lc_bc", active_lc_data.get("Barcode", ""))
         def_lc_img = st.session_state.get("lc_img", active_lc_data.get("Hinh_anh", ""))
         def_lc_tp = st.session_state.get("lc_tp", active_lc_data.get("Thanh_phan", []))
         if target_lc_code:
