@@ -121,7 +121,7 @@ if "logged_in" not in st.session_state:
     st.session_state.role = None
     st.session_state.username = None
 if not st.session_state.logged_in:
-    st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ ĐA KHO")
+    st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ ĐA KHO & BÁN HÀNG")
     with st.form("login_form"):
         username_input = st.text_input("Tên đăng nhập")
         password = st.text_input("Mật khẩu", type="password")
@@ -147,6 +147,7 @@ st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
 menu_choice = st.sidebar.radio(
     "Chọn chức năng:",
     [
+        "🛍️ Bán hàng (POS)",
         "📊 Tổng quan tồn kho", 
         "🔍 Tra cứu & Lọc chi tiết", 
         "✏️ Điều chỉnh thông tin & Giá Combo",
@@ -169,8 +170,152 @@ if st.sidebar.button("🚪 Đăng xuất"):
 # --- GIAO DIỆN CHÍNH BÊN PHẢI ---
 _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
+    # 0. MÀN HÌNH BÁN HÀNG (POS)
+    if menu_choice == "🛍️ Bán hàng (POS)":
+        st.title("🛍️ MÀN HÌNH BÁN HÀNG & THANH TOÁN (POS)")
+        st.markdown("---")
+        if "cart" not in st.session_state:
+            st.session_state.cart = []
+        if not df.empty:
+            # Thu thập toàn bộ sản phẩm/combo bán được
+            all_sellable_items = {}
+            for _, r in df.iterrows():
+                m = r["Ma_LK"]
+                t = r["Ten_LK"]
+                kho = r.get("Kho_quan_ly", "Kho 1")
+                sl = r["So_luong"]
+                dv = r["Don_vi"]
+                gx = float(r.get("Gia_xuat", 0))
+                tp = r.get("Thanh_phan", [])
+                all_sellable_items[m] = {
+                    "Ma_LK": m, "Ten_LK": t, "Kho_quan_ly": kho, 
+                    "So_luong": sl, "Don_vi": dv, "Gia_xuat": gx, "Thanh_phan": tp
+                }
+            col_pos1, col_pos2 = st.columns([1.5, 2.5])
+            with col_pos1:
+                st.subheader("🔍 Chọn sản phẩm")
+                scan_pos = st.text_input("📷 Quét mã QR sản phẩm bán hàng", placeholder="Quét mã QR sản phẩm...")
+                selected_code_pos = None
+                if scan_pos.strip():
+                    clean_pos = scan_pos.strip()
+                    if clean_pos in all_sellable_items:
+                        selected_code_pos = clean_pos
+                        st.success(f"✨ Đã nhận diện: {all_sellable_items[clean_pos]['Ten_LK']}")
+                options_pos = [f"{m} - {info['Ten_LK']} (Tồn: {info['So_luong']} {info['Don_vi']} | Giá: {format_money(info['Gia_xuat'])}đ)" for m, info in all_sellable_items.items()]
+                default_pos_idx = 0
+                if selected_code_pos:
+                    for idx, opt in enumerate(options_pos):
+                        if opt.startswith(selected_code_pos):
+                            default_pos_idx = idx
+                            break
+                chosen_opt_pos = st.selectbox("Hoặc chọn từ danh sách:", options_pos, index=default_pos_idx)
+                chosen_m_pos = chosen_opt_pos.split(" - ")[0]
+                item_info = all_sellable_items[chosen_m_pos]
+                st.write(f"**Giá bán:** `{format_money(item_info['Gia_xuat'])} VNĐ / {item_info['Don_vi']}`")
+                st.write(f"**Tồn kho hiện tại:** `{item_info['So_luong']} {item_info['Don_vi']}` (Kho: {item_info['Kho_quan_ly']})")
+                sl_mua = st.number_input("Số lượng mua", min_value=1, max_value=max(1, int(item_info['So_luong'])), step=1, value=1)
+                if st.button("➕ Thêm vào giỏ hàng", type="primary"):
+                    # Kiểm tra xem sản phẩm đã có trong giỏ chưa
+                    found_in_cart = False
+                    for cart_item in st.session_state.cart:
+                        if cart_item["Ma_LK"] == chosen_m_pos:
+                            cart_item["So_luong_mua"] += sl_mua
+                            found_in_cart = True
+                            break
+                    if not found_in_cart:
+                        st.session_state.cart.append({
+                            "Ma_LK": chosen_m_pos,
+                            "Ten_LK": item_info["Ten_LK"],
+                            "Kho_quan_ly": item_info["Kho_quan_ly"],
+                            "Don_vi": item_info["Don_vi"],
+                            "Gia_xuat": item_info["Gia_xuat"],
+                            "So_luong_mua": sl_mua,
+                            "Thanh_phan": item_info["Thanh_phan"]
+                        })
+                    st.success("Đã thêm vào giỏ hàng!")
+                    st.rerun()
+            with col_pos2:
+                st.subheader("🛒 Giỏ hàng hiện tại")
+                if st.session_state.cart:
+                    df_cart = pd.DataFrame(st.session_state.cart)
+                    df_cart["Thanh_tien"] = df_cart["Gia_xuat"] * df_cart["So_luong_mua"]
+                    df_display_cart = df_cart[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong_mua", "Don_vi"]].copy()
+                    df_display_cart["Gia_xuat_fmt"] = df_cart["Gia_xuat"].apply(format_money)
+                    df_display_cart["Thanh_tien_fmt"] = df_cart["Thanh_tien"].apply(format_money)
+                    df_display_cart.columns = ["Mã QR", "Tên sản phẩm", "Kho", "SL mua", "Đơn vị", "Đơn giá (VNĐ)", "Thành tiền (VNĐ)"]
+                    st.dataframe(df_display_cart, use_container_width=True)
+                    tong_tien_don_hang = df_cart["Thanh_tien"].sum()
+                    st.markdown(f"### 💰 TỔNG TIỀN THANH TOÁN: `{format_money(tong_tien_don_hang)} VNĐ`")
+                    col_del1, col_del2 = st.columns(2)
+                    with col_del1:
+                        if st.button("🗑️ Xóa sạch giỏ hàng"):
+                            st.session_state.cart = []
+                            st.rerun()
+                    with col_del2:
+                        pass
+                    st.markdown("---")
+                    st.subheader("💳 Thông tin thanh toán & Khách hàng")
+                    with st.form("checkout_form"):
+                        ten_khach = st.text_input("Tên khách hàng / Công ty", placeholder="Ví dụ: Anh Nam - Công ty ABC")
+                        sdt_khach = st.text_input("Số điện thoại", placeholder="0912345678")
+                        hinh_thuc_tt = st.radio("Hình thức thanh toán:", ["💵 Tiền mặt", "💳 Chuyển khoản ngân hàng", "📝 Ghi nợ công nợ"], horizontal=True)
+                        ghi_chu_don = st.text_input("Ghi chú đơn hàng", placeholder="Ví dụ: Giao hàng buổi chiều")
+                        checkout_btn = st.form_submit_button("✅ HOÀN TẤT THANH TOÁN & TRỪ KHO", type="primary", use_container_width=True)
+                        if checkout_btn:
+                            try:
+                                ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                                nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
+                                for c_item in st.session_state.cart:
+                                    m_lk = c_item["Ma_LK"]
+                                    sl_mua = c_item["So_luong_mua"]
+                                    kho = c_item["Kho_quan_ly"]
+                                    # Lấy tồn kho hiện tại trong DB
+                                    db_match = df[(df["Ma_LK"] == m_lk) & (df["Kho_quan_ly"] == kho)]
+                                    if not db_match.empty:
+                                        row_db = db_match.iloc[0]
+                                        ton_cu = int(row_db["So_luong"])
+                                        ton_moi = max(0, ton_cu - sl_mua)
+                                        old_logs = row_db.get("Nhat_ky", "")
+                                        log_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 🛒 Bán hàng POS cho khách '{ten_khach}': -{sl_mua} {c_item['Don_vi']} | TT: {hinh_thuc_tt}"
+                                        if ghi_chu_don:
+                                            log_str += f" | Ghi chú: {ghi_chu_don}"
+                                        if old_logs:
+                                            log_str = old_logs + "\n" + log_str
+                                        # Cập nhật kho sản phẩm chính
+                                        supabase.table("Ton_kho").update({
+                                            "So_luong": ton_moi,
+                                            "Nhat_ky": log_str
+                                        }).eq("Ma_LK", m_lk).eq("Kho_quan_ly", kho).execute()
+                                        # Nếu là Combo, tự động trừ định mức linh kiện con
+                                        tp_list = c_item.get("Thanh_phan", [])
+                                        if tp_list and isinstance(tp_list, list):
+                                            for tp in tp_list:
+                                                sub_ma = tp.get("ma")
+                                                sub_sl_tru = int(tp.get("sl", 1)) * sl_mua
+                                                sub_db = df[df["Ma_LK"] == sub_ma]
+                                                if not sub_db.empty:
+                                                    sub_row = sub_db.iloc[0]
+                                                    sub_ton_cu = int(sub_row["So_luong"])
+                                                    sub_ton_moi = max(0, sub_ton_cu - sub_sl_tru)
+                                                    sub_logs = sub_row.get("Nhat_ky", "")
+                                                    sub_log_moi = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📉 Trừ tự động do bán Combo '{m_lk}': -{sub_sl_tru}"
+                                                    if sub_logs:
+                                                        sub_log_moi = sub_logs + "\n" + sub_log_moi
+                                                    supabase.table("Ton_kho").update({
+                                                        "So_luong": sub_ton_moi,
+                                                        "Nhat_ky": sub_log_moi
+                                                    }).eq("Ma_LK", sub_ma).execute()
+                                st.success(f"🎉 Thanh toán đơn hàng thành công! Tổng tiền: {format_money(tong_tien_don_hang)} VNĐ. Đã tự động trừ kho.")
+                                st.session_state.cart = []
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Lỗi khi thanh toán: {e}")
+                else:
+                    st.info("Giỏ hàng đang trống. Vui lòng chọn sản phẩm để thêm vào giỏ.")
+        else:
+            st.info("Kho đang trống. Hãy nhập sản phẩm trước khi bán hàng.")
     # 1. TỔNG QUAN TỒN KHO
-    if menu_choice == "📊 Tổng quan tồn kho":
+    elif menu_choice == "📊 Tổng quan tồn kho":
         col_title, col_select_k = st.columns([2.5, 1.5])
         with col_select_k:
             selected_warehouse = st.selectbox(
