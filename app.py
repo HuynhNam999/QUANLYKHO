@@ -516,7 +516,7 @@ with main_col:
                         st.error(f"Lỗi khi cập nhật: {e}")
                 else:
                     st.warning("Vui lòng bấm nút 'Nạp dữ liệu cũ lên Form' trước khi lưu!")
-    # 4. NHẬP MỚI COMBO (ĐÃ THÊM ẢNH PHIẾU NHẬP)
+    # 4. NHẬP MỚI COMBO
     elif menu_choice == "📥 Nhập mới Combo":
         st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
         render_code_guide()
@@ -551,8 +551,17 @@ with main_col:
         with c2:
             gia_nhap = st.number_input("Giá nhập Combo (VNĐ)", min_value=0, step=1000, value=0, format="%d", key="new_cb_gn")
             gia_xuat = st.number_input("Giá xuất Combo (VNĐ)", min_value=0, step=1000, value=0, format="%d", key="new_cb_gx")
-            hinh_anh = st.text_input("Link ảnh chi tiết sản phẩm (URL công khai)", key="new_cb_img")
-            img_phieu_nhap_cb = st.text_input("🔗 Link ảnh phiếu nhập kho (URL công khai)", placeholder="Dán link ảnh chứng từ/phiếu nhập...", key="new_cb_phieu")
+            # Hỗ trợ tải ảnh sản phẩm hoặc dán link
+            uploaded_img_cb = st.file_uploader("📁 Tải ảnh sản phẩm (hoặc chụp ảnh)", type=["jpg", "jpeg", "png"], key="up_img_cb")
+            hinh_anh = st.text_input("Hoặc dán Link ảnh chi tiết (URL)", key="new_cb_img")
+            if uploaded_img_cb is not None:
+                hinh_anh = f"local_file_{uploaded_img_cb.name}"
+                st.image(uploaded_img_cb, width=120)
+            uploaded_phieu_cb = st.file_uploader("📁 Tải ảnh phiếu nhập kho (hoặc chụp phiếu)", type=["jpg", "jpeg", "png"], key="up_phieu_cb")
+            img_phieu_nhap_cb = st.text_input("Hoặc dán Link ảnh phiếu nhập kho (URL)", key="new_cb_phieu")
+            if uploaded_phieu_cb is not None:
+                img_phieu_nhap_cb = f"local_file_{uploaded_phieu_cb.name}"
+                st.image(uploaded_phieu_cb, width=120)
         if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
             st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống!")
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập mới lô combo đầu năm", key="new_cb_note")
@@ -615,7 +624,6 @@ with main_col:
                 )
             prefix_tp = "LK" if "LK" in item_cat_tp else "VT"
             auto_code_tp = generate_code_from_name(t_name, is_combo=False, item_type=prefix_tp)
-            # Thêm ô quét mã vạch riêng cho từng linh kiện con theo yêu cầu
             sub_c3, sub_c4, sub_c_bc = st.columns([2.5, 1.5, 2])
             with sub_c3:
                 if item_mode_tp.startswith("🤖"):
@@ -664,14 +672,14 @@ with main_col:
                     }
                     supabase.table("Ton_kho").upsert(new_data).execute()
                     st.success("Đã tạo mới Combo thành công vào Database!")
-                    if img_phieu_nhap_cb:
+                    if img_phieu_nhap_cb and img_phieu_nhap_cb.startswith("http"):
                         st.image(img_phieu_nhap_cb, caption="Ảnh phiếu nhập kho", width=300)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
-    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ FIX LỖI TÊN BIẾN & THÊM ẢNH PHIẾU NHẬP)
+    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ SỬA LỖI LOAD GIÁ & THÊM TẢI ẢNH TRỰC TIẾP)
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         render_code_guide()
@@ -718,16 +726,17 @@ with main_col:
             st.session_state.f_gx = 0
             st.session_state.f_bc = ""
             st.session_state.f_qc = 1
+        # Nạp dữ liệu cũ bao gồm cả giá nhập và giá xuất
         if selected_row_data:
             st.session_state.f_ten = selected_row_data.get("Ten_LK", "")
             st.session_state.f_ma = selected_row_data.get("Ma_LK", "")
             st.session_state.f_kho = selected_row_data.get("Kho_quan_ly", "Kho 1")
             st.session_state.f_dv = selected_row_data.get("Don_vi", "Cái")
             st.session_state.f_img = selected_row_data.get("Hinh_anh", "")
-            st.session_state.f_gn = int(selected_row_data.get("Gia_nhap", 0)) if selected_row_data.get("Gia_nhap") else 0
-            st.session_state.f_gx = int(selected_row_data.get("Gia_xuat", 0)) if selected_row_data.get("Gia_xuat") else 0
+            st.session_state.f_gn = int(selected_row_data.get("Gia_nhap", 0)) if pd.notna(selected_row_data.get("Gia_nhap")) else 0
+            st.session_state.f_gx = int(selected_row_data.get("Gia_xuat", 0)) if pd.notna(selected_row_data.get("Gia_xuat")) else 0
             st.session_state.f_bc = selected_row_data.get("Barcode", "") if selected_row_data.get("Barcode") else ""
-            st.session_state.f_qc = int(selected_row_data.get("Quy_cach", 1)) if selected_row_data.get("Quy_cach") else 1
+            st.session_state.f_qc = int(selected_row_data.get("Quy_cach", 1)) if pd.notna(selected_row_data.get("Quy_cach")) else 1
         c1, c2 = st.columns(2)
         with c1:
             ten_lk = st.text_input(
@@ -786,8 +795,17 @@ with main_col:
             loai_gd = st.selectbox("Loại thao tác", ["📥 Nhập kho mới", "🔄 Cập nhật thông tin"], key="le_op_input")
             gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0, step=1000, value=st.session_state.f_gn, format="%d", key="le_gianhap_widget")
             gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0, step=1000, value=st.session_state.f_gx, format="%d", key="le_giaxuat_widget")
-            hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=st.session_state.f_img, key="le_img_input")
-            img_phieu_nhap_le = st.text_input("🔗 Link ảnh phiếu nhập kho (URL công khai)", placeholder="Dán link ảnh chứng từ/phiếu nhập...", key="le_phieu_input")
+            # Tải ảnh sản phẩm hoặc dán link
+            uploaded_img_le = st.file_uploader("📁 Tải ảnh sản phẩm (hoặc chụp ảnh)", type=["jpg", "jpeg", "png"], key="up_img_le")
+            hinh_anh = st.text_input("Hoặc dán Link ảnh chi tiết (URL)", value=st.session_state.f_img, key="le_img_input")
+            if uploaded_img_le is not None:
+                hinh_anh = f"local_file_{uploaded_img_le.name}"
+                st.image(uploaded_img_le, width=120)
+            uploaded_phieu_le = st.file_uploader("📁 Tải ảnh phiếu nhập kho (hoặc chụp phiếu)", type=["jpg", "jpeg", "png"], key="up_phieu_le")
+            img_phieu_nhap_le = st.text_input("Hoặc dán Link ảnh phiếu nhập kho (URL)", key="le_phieu_input")
+            if uploaded_phieu_le is not None:
+                img_phieu_nhap_le = f"local_file_{uploaded_phieu_le.name}"
+                st.image(uploaded_phieu_le, width=120)
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới", key="le_note_input")
         st.markdown("")
         if st.button("💾 Lưu Linh kiện/Vật tư lẻ vào Database", type="primary", use_container_width=True):
@@ -827,7 +845,7 @@ with main_col:
                     }
                     supabase.table("Ton_kho").upsert(new_data).execute()
                     st.success("Đã lưu linh kiện/vật tư lẻ thành công vào Database!")
-                    if img_phieu_nhap_le:
+                    if img_phieu_nhap_le and img_phieu_nhap_le.startswith("http"):
                         st.image(img_phieu_nhap_le, caption="Ảnh phiếu nhập kho", width=300)
                     st.rerun()
                 except Exception as e:
@@ -927,7 +945,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 7. XUẤT KHO COMBO (ĐÃ THÊM ẢNH PHIẾU XUẤT)
+    # 7. XUẤT KHO COMBO
     elif menu_choice == "📤 Xuất kho Combo":
         st.title("📤 XUẤT KHO COMBO (Tự động trừ định mức linh kiện/vật tư con)")
         st.markdown("---")
@@ -987,7 +1005,11 @@ with main_col:
                     if xuat_theo_kien:
                         st.info(f"💡 Quy đổi xuất: {so_luong_xuat_raw} Kiện x {quy_cach_cb} = {so_luong_xuat} {don_vi_tinh}")
                     noi_dung_xuat = st.text_input("Nội dung / Mục đích xuất kho", placeholder="Ví dụ: Xuất lắp ráp bộ combo")
-                    img_phieu_xuat_cb = st.text_input("🔗 Link ảnh phiếu xuất kho (URL công khai)", placeholder="Dán link ảnh chứng từ/phiếu xuất...")
+                    uploaded_phieu_xuat_cb = st.file_uploader("📁 Tải ảnh phiếu xuất kho (hoặc chụp phiếu)", type=["jpg", "jpeg", "png"], key="up_phieu_xuat_cb")
+                    img_phieu_xuat_cb = st.text_input("Hoặc dán Link ảnh phiếu xuất kho (URL)", key="ex_phieu_cb")
+                    if uploaded_phieu_xuat_cb is not None:
+                        img_phieu_xuat_cb = f"local_file_{uploaded_phieu_xuat_cb.name}"
+                        st.image(uploaded_phieu_xuat_cb, width=120)
                     export_btn = st.form_submit_button("Xác nhận Xuất Combo")
                     if export_btn:
                         try:
@@ -1027,7 +1049,7 @@ with main_col:
                                             "Nhat_ky": sub_logs + sub_log_moi
                                         }).eq("Ma_LK", sub_ma).execute()
                             st.success(f"Xuất kho Combo thành công! Đã trừ định mức linh kiện/vật tư thành phần.")
-                            if img_phieu_xuat_cb:
+                            if img_phieu_xuat_cb and img_phieu_xuat_cb.startswith("http"):
                                 st.image(img_phieu_xuat_cb, caption="Ảnh phiếu xuất kho", width=300)
                             st.rerun()
                         except Exception as e:
@@ -1036,7 +1058,7 @@ with main_col:
                 st.warning("Hiện chưa có mã Combo nào trong hệ thống!")
         else:
             st.warning("Kho hiện đang trống!")
-    # 8. XUẤT KHO LINH KIỆN LẺ (ĐÃ THÊM ẢNH PHIẾU XUẤT)
+    # 8. XUẤT KHO LINH KIỆN LẺ
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
         st.title("📤 XUẤT KHO LINH KIỆN / VẬT TƯ LẺ (Độc lập & Thành phần)")
         st.markdown("---")
@@ -1124,7 +1146,11 @@ with main_col:
                     if xuat_kien_le:
                         st.info(f"💡 Quy đổi xuất: {so_luong_xuat_raw} Kiện x {quy_cach_le_xuat} = {so_luong_xuat} {don_vi_tinh}")
                     noi_dung_xuat = st.text_input("Nội dung / Mục đích xuất kho", placeholder="Ví dụ: Xuất vật tư sửa chữa lẻ")
-                    img_phieu_xuat_le = st.text_input("🔗 Link ảnh phiếu xuất kho (URL công khai)", placeholder="Dán link ảnh chứng từ/phiếu xuất...")
+                    uploaded_phieu_xuat_le = st.file_uploader("📁 Tải ảnh phiếu xuất kho (hoặc chụp phiếu)", type=["jpg", "jpeg", "png"], key="up_phieu_xuat_le")
+                    img_phieu_xuat_le = st.text_input("Hoặc dán Link ảnh phiếu xuất kho (URL)", key="ex_phieu_le")
+                    if uploaded_phieu_xuat_le is not None:
+                        img_phieu_xuat_le = f"local_file_{uploaded_phieu_xuat_le.name}"
+                        st.image(uploaded_phieu_xuat_le, width=120)
                     export_btn = st.form_submit_button("Xác nhận Xuất Linh kiện/Vật tư")
                     if export_btn:
                         try:
@@ -1176,7 +1202,7 @@ with main_col:
                                                     "Nhat_ky": cb_log_moi
                                                 }).eq("Ma_LK", cb_ma).execute()
                             st.success(f"Xuất linh kiện lẻ thành công! Hệ thống đã tự động đồng bộ giảm số lượng bộ Combo tương ứng.")
-                            if img_phieu_xuat_le:
+                            if img_phieu_xuat_le and img_phieu_xuat_le.startswith("http"):
                                 st.image(img_phieu_xuat_le, caption="Ảnh phiếu xuất kho", width=300)
                             st.rerun()
                         except Exception as e:
