@@ -1515,3 +1515,30 @@ with main_col:
             st.warning("Kho hiện đang trống!")
     # 11. BÁO CÁO & XUẤT EXCEL
     elif menu_choice == "📈 Báo cáo & Xuất Excel":
+        st.title("📈 Báo Cáo Kho & Xuất File Excel")
+        st.markdown("---")
+        st.info("💡 Bạn có thể tải toàn bộ dữ liệu tồn kho dưới dạng file **Excel (.xlsx)**.")
+        if not df.empty:
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_ton_kho = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach"]].copy()
+                df_ton_kho.columns = ["Mã QR Sản Phẩm / Combo", "Tên Sản Phẩm", "Kho Quản Lý", "Số Lượng Tồn Kho", "Đơn Vị Tính", "Quy Cách (SL/Kiện)"]
+                df_ton_kho.to_excel(writer, sheet_name='Ton_Kho_Hien_Tai', index=False)
+                df_nhat_ky = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Nhat_ky"]].copy()
+                df_nhat_ky.columns = ["Mã QR Sản Phẩm", "Tên Sản Phẩm", "Kho Quản Lý", "Lịch Sử Nhật Ký Chi Tiết"]
+                df_nhat_ky.to_excel(writer, sheet_name='Lich_Su_Nhat_Ky', index=False)
+            excel_data = output.getvalue()
+            time_stamp = datetime.now().strftime("%Y%m%d_%H%M")
+            col_rep1, col_rep2 = st.columns(2)
+            with col_rep1:
+                st.metric("Tổng số mặt hàng / Combo", len(df["Ma_LK"].unique()))
+                st.metric("Tổng lượng kho", int(df["So_luong"].sum()) if "So_luong" in df else 0)
+            with col_rep2:
+                st.download_button(
+                    label="📥 Tải Báo Cáo Kho Dạng Excel (.xlsx)",
+                    data=excel_data,
+                    file_name=f"Bao_Cao_Da_Kho_{time_stamp}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+        else:
+            st.warning("Kho hiện đang trống!")
