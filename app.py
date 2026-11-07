@@ -6,11 +6,17 @@ import json
 import io
 import re
 import unicodedata
-# Cấu hình giao diện toàn màn hình
-st.set_page_config(page_title="Quản Lý Đa Kho Cá Nhân", page_icon="📦", layout="wide")
-# CSS căn giữa toàn bộ bảng trong Streamlit
+# Cấu hình giao diện toàn màn hình và tự động tương thích thiết bị di động
+st.set_page_config(
+    page_title="Quản Lý Đa Kho Cá Nhân", 
+    page_icon="📦", 
+    layout="wide",
+    initial_sidebar_state="auto"
+)
+# CSS căn giữa bảng, tối ưu nút bấm và giao diện trên điện thoại di động
 st.markdown("""
     <style>
+    /* Căn giữa toàn bộ bảng trong Streamlit */
     div[data-testid="stDataFrame"] div[role="grid"] div[role="gridcell"] {
         text-align: center !important;
         justify-content: center !important;
@@ -18,6 +24,18 @@ st.markdown("""
     div[data-testid="stDataFrame"] div[role="grid"] div[role="columnheader"] {
         text-align: center !important;
         justify-content: center !important;
+    }
+    /* Tối ưu nút bấm thân thiện hơn với ngón tay trên điện thoại */
+    div.stButton > button {
+        width: 100%;
+        min-height: 2.8em;
+        font-weight: bold;
+    }
+    /* Tự động xếp chồng các cột trên màn hình nhỏ (Mobile) */
+    @media (max-width: 768px) {
+        .row-widget.stHorizontal {
+            flex-direction: column;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
