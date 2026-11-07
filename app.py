@@ -585,8 +585,14 @@ with main_col:
             if uploaded_phieu_cb is not None:
                 img_phieu_nhap_cb = f"local_file_{uploaded_phieu_cb.name}"
                 st.image(uploaded_phieu_cb, width=120)
-        if ma_lk and not df.empty and ma_lk in df["Ma_LK"].values:
-            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống!")
+        # CHẶN TOÀN HỆ THỐNG: Nếu mã Combo đã tồn tại ở bất kỳ kho nào
+        is_duplicate_cb = False
+        if ma_lk and not df.empty:
+            matched_cb_any = df[df["Ma_LK"] == ma_lk]
+            if not matched_cb_any.empty:
+                is_duplicate_cb = True
+                existing_kho = ", ".join(matched_cb_any["Kho_quan_ly"].unique())
+                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ TOÀN HỆ THỐNG:** Mã Combo `{ma_lk}` đã tồn tại trong hệ thống (tại **{existing_kho}**). Vui lòng dùng chức năng 'Nhập Combo cũ' nếu muốn nhập thêm!")
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập mới lô combo đầu năm", key="new_cb_note")
         st.markdown("---")
         st.markdown("### 🧩 PHẦN 2: KHAI BÁO THÀNH PHẦN & MÃ VẠCH TỪNG LINH KIỆN CON")
@@ -676,7 +682,7 @@ with main_col:
         danh_sach_thanh_phan = [item for item in tps_input if item["ten"] and item["ten"].strip() != ""]
         st.markdown("")
         if st.button("💾 Lưu Mới Combo vào Database", type="primary", use_container_width=True):
-            if ma_lk and ten_lk:
+            if ma_lk and ten_lk and not is_duplicate_cb:
                 try:
                     ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                     nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
@@ -707,7 +713,7 @@ with main_col:
                 except Exception as e:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
-                st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
+                st.warning("Vui lòng kiểm tra lại Mã, Tên Combo hoặc tránh trùng mã trên toàn hệ thống!")
     # 5. NHẬP COMBO CŨ
     elif menu_choice == "📥 Nhập Combo cũ":
         st.title("📦 NHẬP BỔ SUNG COMBO CŨ")
@@ -793,7 +799,7 @@ with main_col:
                     try:
                         ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                         nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                        matched_db_cb = df[(df["Ma_LK"] == target_cb_nc_code) & (df["Kho_quan_ly"] == kho_nhap_cb_cu)]
+                        matched_db_cb = df[(df["Ma_LK"] == target_cb_nc_code) & (df["Kho_quan_ly"] == kho_nhap_cb_cu)] if "Kho_quan_ly" in df.columns else pd.DataFrame()
                         current_ton_cb = so_luong_thuc_te_cb_cu
                         old_logs_cb = ""
                         if not matched_db_cb.empty:
@@ -875,12 +881,18 @@ with main_col:
             if uploaded_phieu_lk_moi is not None:
                 img_phieu_lk_moi = f"local_file_{uploaded_phieu_lk_moi.name}"
                 st.image(uploaded_phieu_lk_moi, width=120)
-        if ma_lk_moi and not df.empty and ma_lk_moi in df["Ma_LK"].values:
-            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã linh kiện `{ma_lk_moi}` đã tồn tại trong hệ thống!")
+        # CHẶN TOÀN HỆ THỐNG: Nếu mã linh kiện đã tồn tại ở bất kỳ kho nào trong database
+        is_duplicate_lk = False
+        if ma_lk_moi and not df.empty:
+            matched_lk_any = df[df["Ma_LK"] == ma_lk_moi]
+            if not matched_lk_any.empty:
+                is_duplicate_lk = True
+                existing_kho = ", ".join(matched_lk_any["Kho_quan_ly"].unique())
+                st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ TOÀN HỆ THỐNG:** Mã linh kiện `{ma_lk_moi}` đã tồn tại trong hệ thống (tại **{existing_kho}**). Vui lòng dùng chức năng 'Nhập linh kiện cũ' để cộng dồn!")
         ghi_chu_lk_moi = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập mới linh kiện kho", key="new_lk_note")
         st.markdown("")
         if st.button("💾 Lưu Mới Linh kiện vào Database", type="primary", use_container_width=True):
-            if ma_lk_moi and ten_lk_moi:
+            if ma_lk_moi and ten_lk_moi and not is_duplicate_lk:
                 try:
                     ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                     nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
@@ -911,7 +923,7 @@ with main_col:
                 except Exception as e:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
-                st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện/vật tư!")
+                st.warning("Vui lòng điền đầy đủ Mã, Tên linh kiện hoặc tránh trùng mã trên toàn hệ thống!")
     # 7. NHẬP LINH KIỆN CŨ
     elif menu_choice == "📥 Nhập linh kiện cũ":
         st.title("🔩 NHẬP BỔ SUNG LINH KIỆN / VẬT TƯ CŨ")
@@ -924,7 +936,6 @@ with main_col:
             for _, r in df.iterrows():
                 m = r["Ma_LK"]
                 t = r["Ten_LK"]
-                # Xử lý an toàn nếu thiếu cột Kho_quan_ly trên DB
                 kho = r["Kho_quan_ly"] if "Kho_quan_ly" in r and pd.notna(r["Kho_quan_ly"]) else "Kho 1"
                 dv = r["Don_vi"]
                 sl = r["So_luong"]
