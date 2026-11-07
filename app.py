@@ -113,6 +113,11 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
     st.session_state.username = None
+# Quản lý đăng nhập
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.role = None
+    st.session_state.username = None
 if not st.session_state.logged_in:
     st.title("🔐 ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ ĐA KHO & BÁN HÀNG")
     with st.form("login_form"):
@@ -120,59 +125,65 @@ if not st.session_state.logged_in:
         password = st.text_input("Mật khẩu", type="password")
         submit_btn = st.form_submit_button("Đăng nhập")
         if submit_btn:
-            if username_input == "admin" and password == "123456":
+            # --- TÀI KHOẢN QUẢN TRỊ VIÊN ---
+            if username_input == "admin" and password == "admin123":
                 st.session_state.logged_in = True
                 st.session_state.role = "Admin"
                 st.session_state.username = "Quản trị viên (Admin)"
-                st.rerun()       
-            # --- Kho 1 có 2 nhân viên (nv1 và nv1_phu) ---
-            elif username_input in ["nv1", "nv1_phu"] and password == "123456":
+                st.rerun()
+            # --- KHO 1 (Có 2 nhân viên, mỗi người 1 pass riêng) ---
+            elif username_input == "nhanvien1_an" and password == "passAn123":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
-                st.session_state.username = "Nhân viên Kho 1"
+                st.session_state.username = "Nhân viên An (Kho 1)"
                 st.rerun()
-            # --- Các kho từ 2 đến 10 ---
-            elif username_input in ["nv2"] and password == "123456":
+            elif username_input == "nhanvien1_binh" and password == "passBinh456":
+                st.session_state.logged_in = True
+                st.session_state.role = "Nhân viên"
+                st.session_state.username = "Nhân viên Bình (Kho 1)"
+                st.rerun()
+            # --- CÁC KHO KHÁC (Từ Kho 2 đến Kho 10) ---
+            elif username_input == "nv_kho2" and password == "kho2_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 2"
                 st.rerun()
-            elif username_input in ["nv3"] and password == "123456":
+            elif username_input == "nv_kho3" and password == "kho3_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 3"
                 st.rerun()
-            elif username_input in ["nv4"] and password == "123456":
+            elif username_input == "nv_kho4" and password == "kho4_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 4"
                 st.rerun()
-            elif username_input in ["nv5"] and password == "123456":
+            elif username_input == "nv_kho5" and password == "kho5_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 5"
                 st.rerun()
-            elif username_input in ["nv6"] and password == "123456":
+            elif username_input == "nv_kho6" and password == "kho6_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 6"
                 st.rerun()
-            elif username_input in ["nv7"] and password == "123456":
+            elif username_input == "nv_kho7" and password == "kho7_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 7"
                 st.rerun()
-            elif username_input in ["nv8"] and password == "123456":
+            elif username_input == "nv_kho8" and password == "kho8_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 8"
                 st.rerun()
-            elif username_input in ["nv9"] and password == "123456":
+            elif username_input == "nv_kho9" and password == "kho9_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 9"
                 st.rerun()
-            elif username_input in ["nv10"] and password == "123456":
+            elif username_input == "nv_kho10" and password == "kho10_2026":
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên Kho 10"
