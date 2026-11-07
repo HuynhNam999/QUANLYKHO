@@ -3,3 +3,6 @@ pandas
 supabase
 openpyxl
 qrcode[pil]
+opencv-python-headless
+pyzbar
+openpyxl
