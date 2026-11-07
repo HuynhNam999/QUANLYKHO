@@ -566,13 +566,12 @@ with main_col:
             if final_search_code:
                 filtered_df = filtered_df[filtered_df["Ma_LK"] == final_search_code]
             if loai_loc != "Tất cả":
-                keyword_map = {
-                    "📥 Nhập kho": "Nhập kho",
-                    "📤 Xuất kho": "Xuất kho",
-                    "🔄 Cập nhật thông tin": "Cập nhật"
-                }
-                kw = keyword_map.get(loai_loc, "")
-                filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(kw, na=False)]
+                if "Nhập kho" in loai_loc:
+                    filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains("Nhập kho|Cộng dồn|Nhận từ", na=False, case=False)]
+                elif "Xuất kho" in loai_loc:
+                    filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains("Xuất|Bán hàng|Trừ|Xé lẻ", na=False, case=False)]
+                elif "Cập nhật" in loai_loc:
+                    filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains("Cập nhật", na=False, case=False)]
             if bat_tat_ngay:
                 format_ngay = ngay_chon.strftime("%d/%m/%Y")
                 filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(format_ngay, na=False)]
@@ -586,50 +585,58 @@ with main_col:
                     kho = r.get("Kho_quan_ly", "Kho 1")
                     raw_log = str(r.get("Nhat_ky", ""))
                     if raw_log and raw_log != "nan":
-                        # Mỗi dòng nhật ký trong chuỗi được ngăn cách bởi dấu xuống dòng \n
                         log_lines = raw_log.split("\n")
                         for line in log_lines:
                             line = line.strip()
                             if not line:
                                 continue
-                            # Tách định dạng chuẩn: [07/11/2026 03:29] 👤 Người - 📥 Hành động | Ghi chú...
                             thoi_gian = ""
                             nguoi_thuc_hien = ""
                             hanh_dong = line
                             ghi_chu = ""
-                            # Bóc tách thời gian trong ngoặc vuông đầu dòng [...]
                             match_time = re.match(r'\[(.*?)\](.*)', line)
                             if match_time:
                                 thoi_gian = match_time.group(1).strip()
                                 remaining = match_time.group(2).strip()
                             else:
                                 remaining = line
-                            # Bóc tách người thực hiện (có icon 👤 hoặc theo gạch ngang đầu tiên)
                             if "👤" in remaining:
                                 parts_user = remaining.split(" - ", 1)
                                 nguoi_thuc_hien = parts_user[0].replace("👤", "").strip()
                                 remaining = parts_user[1] if len(parts_user) > 1 else ""
-                            # Bóc tách ghi chú (sau dấu |)
                             if " | " in remaining:
                                 parts_note = remaining.split(" | ", 1)
                                 hanh_dong = parts_note[0].strip()
                                 ghi_chu = parts_note[1].strip()
                             else:
                                 hanh_dong = remaining.strip()
-                            expanded_logs.append({
-                                "Mã QR / Sản phẩm": m_lk,
-                                "Tên sản phẩm": t_lk,
-                                "Kho": kho,
-                                "Thời gian": thoi_gian,
-                                "Người thao tác": nguoi_thuc_hien,
-                                "Hành động / Sự kiện": hanh_dong,
-                                "Ghi chú chi tiết": ghi_chu
-                            })
+                            # Nếu đang lọc hạng mục, kiểm tra lại dòng log này có khớp chính xác với bộ lọc không
+                            matched_row = True
+                            if loai_loc != "Tất cả":
+                                if "Nhập kho" in loai_loc:
+                                    if not any(k in hanh_dong for k in ["Nhập", "Cộng dồn", "Nhận từ"]):
+                                        matched_row = False
+                                elif "Xuất kho" in loai_loc:
+                                    if not any(k in hanh_dong for k in ["Xuất", "Bán hàng", "Trừ", "Xé lẻ"]):
+                                        matched_row = False
+                                elif "Cập nhật" in loai_loc:
+                                    if "Cập nhật" not in hanh_dong:
+                                        matched_row = False
+                            if matched_row:
+                                expanded_logs.append({
+                                    "Mã QR / Sản phẩm": m_lk,
+                                    "Tên sản phẩm": t_lk,
+                                    "Kho": kho,
+                                    "Thời gian": thoi_gian,
+                                    "Người thao tác": nguoi_thuc_hien,
+                                    "Hành động / Sự kiện": hanh_dong,
+                                    "Ghi chú chi tiết": ghi_chu
+                                })
                 if expanded_logs:
                     df_logs_display = pd.DataFrame(expanded_logs)
                     st.dataframe(df_logs_display, use_container_width=True, height=450)
                 else:
-                    st.warning("Không có nội dung nhật ký nào.")
+                    st.warning("Không có nội dung nhật ký nào phù hợp với bộ lọc hạng mục.")
             else:
                 st.warning("Không tìm thấy dữ liệu nhật ký phù hợp với bộ lọc hiện tại.")
         else:
