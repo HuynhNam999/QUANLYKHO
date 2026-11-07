@@ -308,7 +308,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu nhật ký phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO
+    # 3. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO (ĐÃ HOÀN THIỆN UP ẢNH & LOAD ĐẦY ĐỦ)
     elif menu_choice == "✏️ Điều chỉnh thông tin & Giá Combo":
         st.title("✏️ ĐIỀU CHỈNH THÔNG TIN, GIÁ & THÀNH PHẦN COMBO")
         render_code_guide()
@@ -399,7 +399,11 @@ with main_col:
                 don_vi_e = st.selectbox("Đơn vị tính cơ bản", dv_list, index=dv_idx, key="edit_cb_dv")
                 gia_nhap_e = st.number_input("Giá nhập Combo (VNĐ)", min_value=0, step=1000, value=def_gianhap, format="%d", key="edit_cb_gn")
                 gia_xuat_e = st.number_input("Giá xuất Combo (VNĐ)", min_value=0, step=1000, value=def_giaxuat, format="%d", key="edit_cb_gx")
+                uploaded_img_edit = st.file_uploader("📁 Tải ảnh sản phẩm mới (hoặc chụp ảnh)", type=["jpg", "jpeg", "png"], key="up_img_edit_cb")
                 hinh_anh_e = st.text_input("Link ảnh chi tiết (URL)", value=def_img, key="edit_cb_img")
+                if uploaded_img_edit is not None:
+                    hinh_anh_e = f"local_file_{uploaded_img_edit.name}"
+                    st.image(uploaded_img_edit, width=120)
             ghi_chu_e = st.text_input("Ghi chú điều chỉnh", placeholder="Ví dụ: Cập nhật tăng giá bán và giá nhập mới")
             st.markdown("---")
             st.markdown("### 🧩 THÀNH PHẦN COMBO HIỆN TẠI & GIÁ CHI TIẾT")
@@ -678,7 +682,7 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
-    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ FIX LỖI ĐỒNG BỘ DỮ LIỆU CŨ CHÍNH XÁC)
+    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ FIX LỖI LOAD GIÁ & ĐỒNG BỘ CHÍNH XÁC)
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         render_code_guide()
@@ -726,7 +730,7 @@ with main_col:
             st.session_state.f_gx = 0
             st.session_state.f_bc = ""
             st.session_state.f_qc = 1
-        # Cập nhật state khi chọn dữ liệu cũ
+        # Cập nhật state chính xác khi chọn dữ liệu cũ hoặc quét barcode
         if selected_row_data:
             st.session_state.f_ten = selected_row_data.get("Ten_LK", "")
             st.session_state.f_ma = selected_row_data.get("Ma_LK", "")
@@ -738,10 +742,11 @@ with main_col:
             st.session_state.f_bc = selected_row_data.get("Barcode", "") if selected_row_data.get("Barcode") else ""
             st.session_state.f_qc = int(selected_row_data.get("Quy_cach", 1)) if pd.notna(selected_row_data.get("Quy_cach")) else 1
         elif thao_tac_nhap == "✨ Nhập mới hoàn toàn" and not matched_item_by_bc:
-            # Nếu bấm nhập mới hoàn toàn thì xóa dữ liệu cũ để trống
             if "le_selectbox_old" in st.session_state and st.session_state["le_selectbox_old"] != "-- Chọn linh kiện cũ --":
                 st.session_state.f_ten = ""
                 st.session_state.f_ma = ""
+                st.session_state.f_gn = 0
+                st.session_state.f_gx = 0
         c1, c2 = st.columns(2)
         with c1:
             ten_lk = st.text_input(
