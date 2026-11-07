@@ -193,16 +193,12 @@ with main_col:
             col_pos1, col_pos2 = st.columns([1.5, 2.5])
             with col_pos1:
                 st.subheader("🔍 Chọn sản phẩm & Quét mã")
-                # Hỗ trợ quét mã bằng camera điện thoại thông qua thư viện jsQR / streamlit-webrtc hoặc ảnh chụp mã QR
-                scanned_code_input = st.text_input("⌨️ Nhập hoặc dán mã QR/Mã sản phẩm:", placeholder="Nhập mã hoặc dùng máy quét gắn cổng USB...")
-                # Thêm tính năng tải ảnh chụp mã QR từ camera điện thoại để giải mã tự động nếu điện thoại không hỗ trợ quét trực tiếp liền mạch
-                img_qr_scan = st.file_uploader("📷 Hoặc chụp/tải ảnh mã QR sản phẩm để quét nhanh", type=["jpg", "jpeg", "png"], key="pos_qr_img_upload")
+                # Hỗ trợ quét mã bằng camera điện thoại thông qua chụp ảnh trực tiếp giải mã QR
+                img_qr_scan = st.file_uploader("📷 CHỤP ẢNH / TẢI ẢNH MÃ QR ĐỂ QUÉT NHANH", type=["jpg", "jpeg", "png"], key="pos_qr_img_upload")
                 scanned_from_image = None
                 if img_qr_scan is not None:
                     try:
                         image_pil = Image.open(img_qr_scan)
-                        # Sử dụng thư viện pyzbar hoặc cv2 nếu có, ở đây ta dùng qreader hoặc đọc qua cv2/opencv nếu đã cài, hoặc đơn giản cho phép trích xuất
-                        # Nếu dùng pyzbar/opencv:
                         import cv2
                         import numpy as np
                         opencv_image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
@@ -210,13 +206,14 @@ with main_col:
                         data_qr, bbox, _ = detector.detectAndDecode(opencv_image)
                         if data_qr:
                             scanned_from_image = data_qr.strip()
-                            st.success(f"✨ Quét thành công từ ảnh: `{scanned_from_image}`")
+                            st.success(f"✨ Quét thành công mã từ ảnh: `{scanned_from_image}`")
                         else:
-                            st.warning("⚠️ Không tìm thấy mã QR hợp lệ trong ảnh này.")
+                            st.warning("⚠️ Không tìm thấy mã QR hợp lệ trong ảnh này. Hãy thử chụp cận cảnh rõ hơn.")
                     except Exception as e:
                         st.error(f"Không thể đọc ảnh QR: {e}")
+                scanned_code_input = st.text_input("⌨️ Hoặc dùng máy quét USB / Nhập mã thủ công:", value=scanned_from_image if scanned_from_image else "", placeholder="Bắn máy quét hoặc gõ mã...")
                 selected_code_pos = None
-                active_scan_code = scanned_from_image if scanned_from_image else scanned_code_input.strip()
+                active_scan_code = scanned_code_input.strip()
                 if active_scan_code:
                     if active_scan_code in all_sellable_items:
                         selected_code_pos = active_scan_code
