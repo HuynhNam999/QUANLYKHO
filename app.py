@@ -113,7 +113,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-# --- MENU ĐIỀU HƯỚNG BÊN TRÁI (ĐÃ BỎ MỤC CHỌN KHO) ---
+# --- MENU ĐIỀU HƯỚNG BÊN TRÁI ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
@@ -142,7 +142,6 @@ _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
     # 1. TỔNG QUAN TỒN KHO
     if menu_choice == "📊 Tổng quan tồn kho":
-        # Ô chọn kho di chuyển sang bên phải giao diện chính
         col_title, col_select_k = st.columns([2.5, 1.5])
         with col_select_k:
             selected_warehouse = st.selectbox(
@@ -161,7 +160,6 @@ with main_col:
             df_working["So_luong"] = pd.to_numeric(df_working["So_luong"], errors="coerce").fillna(0)
             df_working["Gia_nhap"] = pd.to_numeric(df_working["Gia_nhap"], errors="coerce").fillna(0)
             if selected_warehouse != "🌐 Xem tất cả các kho":
-                # Lọc đúng theo kho chọn
                 df_filtered = df_working[df_working["Kho_quan_ly"] == selected_warehouse].copy()
                 df_filtered["Thanh_tien"] = df_filtered["So_luong"] * df_filtered["Gia_nhap"]
                 tong_gia_tri_kho = df_filtered["Thanh_tien"].sum()
@@ -180,7 +178,6 @@ with main_col:
                 df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Kho quản lý", "Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
                 st.dataframe(df_display, use_container_width=True, height=500)
             else:
-                # XEM TẤT CẢ CÁC KHO: Gom nhóm theo Mã sản phẩm & Cộng dồn tồn kho
                 def aggregate_stock(group):
                     ten_lk = group["Ten_LK"].iloc[0]
                     don_vi = group["Don_vi"].iloc[0]
@@ -189,7 +186,6 @@ with main_col:
                     gia_xuat = group["Gia_xuat"].iloc[0]
                     barcode = group["Barcode"].iloc[0]
                     tong_ton = int(group["So_luong"].sum())
-                    # Tạo chuỗi chi tiết kho (VD: Kho 1 tồn 10, Kho 2 tồn 5)
                     chi_tiet_kho_list = []
                     for _, r in group.iterrows():
                         if r["So_luong"] > 0:
@@ -260,7 +256,6 @@ with main_col:
                 with col_info1:
                     st.write(f"**Mã LK/VT/CB:** {item_row.get('Ma_LK', '')}")
                     st.write(f"**Tên:** {item_row.get('Ten_LK', '')}")
-                    # Hiển thị tồn kho phân theo từng kho
                     matched_item_all = df[df["Ma_LK"] == selected_item]
                     stock_detail_str = ", ".join([f"{r['Kho_quan_ly']}: {r['So_luong']} {r['Don_vi']}" for _, r in matched_item_all.iterrows()])
                     st.write(f"**📦 Phân bổ tồn kho:** {stock_detail_str}")
@@ -659,21 +654,24 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
-    # 5. NHẬP MỚI LINH KIỆN LẺ
+    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ TỐI ƯU LOAD MÃ CŨ)
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         render_code_guide()
         st.markdown("---")
+        # Gom nhóm toàn bộ linh kiện/vật tư độc lập từ mọi kho để load mã cũ chuẩn xác
         existing_items = ["-- Tạo mới / Nhập mới hoàn toàn --"]
         item_dict = {}
         if not df.empty:
-            df_le = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
+            df_le = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)].copy()
             for _, r in df_le.iterrows():
-                display_str = f"{r['Ma_LK']} - {r['Ten_LK']} ({r.get('Kho_quan_ly', 'Kho 1')})"
-                existing_items.append(display_str)
-                item_dict[display_str] = r.to_dict()
-        if "le_selected_val" not in st.session_state:
-            st.session_state.le_selected_val = "-- Tạo mới / Nhập mới hoàn toàn --"
+                m_code = r["Ma_LK"]
+                t_name = r["Ten_LK"]
+                kho_ql = r.get("Kho_quan_ly", "Kho 1")
+                display_str = f"{m_code} - {t_name} (Kho: {kho_ql})"
+                if display_str not in item_dict:
+                    existing_items.append(display_str)
+                    item_dict[display_str] = r.to_dict()
         def on_le_select_change():
             sel = st.session_state.get("le_sel_box", "-- Tạo mới / Nhập mới hoàn toàn --")
             if sel != "-- Tạo mới / Nhập mới hoàn toàn --":
@@ -786,9 +784,6 @@ with main_col:
             gia_nhap = st.number_input("Giá nhập (VNĐ)", min_value=0, step=1000, value=st.session_state.le_gianhap_val, format="%d", key="le_gianhap_widget")
             gia_xuat = st.number_input("Giá xuất (VNĐ)", min_value=0, step=1000, value=st.session_state.le_giaxuat_val, format="%d", key="le_giaxuat_widget")
             hinh_anh = st.text_input("Link ảnh chi tiết (URL công khai)", value=st.session_state.le_img_input_val, key="le_img_input")
-        if ma_lk and selected_existing == "-- Tạo mới / Nhập mới hoàn toàn --" and not df.empty and ma_lk in df["Ma_LK"].values:
-            dup_row = df[df["Ma_LK"] == ma_lk].iloc[0]
-            st.error(f"⚠️ **CẢNH BÁO TRÙNG MÃ:** Mã `{ma_lk}` đã tồn tại trong kho **{dup_row.get('Kho_quan_ly', 'Kho 1')}** với tên **{dup_row['Ten_LK']}** (Tồn: {dup_row['So_luong']}).")
         ghi_chu_tay = st.text_input("Ghi chú thêm", placeholder="Ví dụ: Nhập vật tư lẻ lô mới", key="le_note_input")
         st.markdown("")
         if st.button("💾 Lưu Linh kiện/Vật tư lẻ vào Database", type="primary", use_container_width=True):
@@ -801,8 +796,10 @@ with main_col:
                         nhat_ky_str += f" | Ghi chú: {ghi_chu_tay}"
                     old_tp = []
                     current_stock_le = so_luong_thuc_te_le
-                    if not df.empty and ma_lk in df["Ma_LK"].values:
-                        old_row = df[df["Ma_LK"] == ma_lk].iloc[0]
+                    # Kiểm tra xem sản phẩm đã tồn tại trong kho cụ thể đó chưa
+                    matched_db = df[(df["Ma_LK"] == ma_lk) & (df["Kho_quan_ly"] == kho_nhap_le)]
+                    if not matched_db.empty:
+                        old_row = matched_db.iloc[0]
                         old_tp = old_row.get("Thanh_phan", [])
                         if loai_gd == "📥 Nhập kho mới":
                             current_stock_le = int(old_row["So_luong"]) + int(so_luong_thuc_te_le)
