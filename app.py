@@ -28,7 +28,7 @@ def init_supabase():
     key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 supabase: Client = init_supabase()
-# Tải dữ liệu tồn kho
+# Tải dữ liệu tồn kho & tự động kiểm tra cấu trúc cột
 @st.cache_data(ttl=0)
 def load_data():
     try:
@@ -83,10 +83,9 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
 def render_code_guide():
     with st.expander("💡 HƯỚNG DẪN QUY TẮC TẠO MÃ SẢN PHẨM & COMBO"):
         st.markdown("""
-        - **Mã Combo (`CB-`)**: Hệ thống tự động gom từ viết tắt của tên Combo (VD: *Bộ bàn ghế phòng khách* $\rightarrow$ `CB-BO_BAN_GHE`).
-        - **Mã Vật Tư (`VT-`)**: Dùng cho các vật tư tiêu hao, bu lông, ốc vít (VD: *Bulong M24* $\rightarrow$ `VT-BL_M24`).
-        - **Mã Linh Kiện (`LK-`)**: Dùng cho các linh kiện thiết bị, máy móc (VD: *Mô tơ cửa cuốn* $\rightarrow$ `LK-MO_TO_CUA_CUON`).
-        - Bạn có thể chọn chế độ **✍️ Tự viết** nếu muốn tự đặt mã theo quy ước riêng.
+        - **Mã Combo (`CB-`)**: Hệ thống tự động gom từ viết tắt của tên Combo.
+        - **Mã Vật Tư (`VT-`)**: Dùng cho các vật tư tiêu hao, bu lông, ốc vít.
+        - **Mã Linh Kiện (`LK-`)**: Dùng cho các linh kiện thiết bị, máy móc.
         """)
 # Quản lý đăng nhập
 if "logged_in" not in st.session_state:
@@ -168,7 +167,7 @@ with main_col:
                 tong_so_luong = int(df_filtered["So_luong"].sum())
                 col_m1, col_m2, col_m3 = st.columns([2, 2, 3])
                 with col_m1:
-                    st.metric(label="📊 TỔNG MẶT HÀNG IN KHO", value=f"{len(df_filtered)} sản phẩm")
+                    st.metric(label="📊 TỔNG MẶT HÀNG TRONG KHO", value=f"{len(df_filtered)} sản phẩm")
                 with col_m2:
                     st.metric(label="📦 TỔNG SỐ LƯỢNG TỒN", value=f"{format_money(tong_so_luong)} đơn vị")
                 with col_m3:
@@ -295,8 +294,8 @@ with main_col:
                         if str(img_url).startswith("http"):
                             st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=280)
                         elif str(img_url).startswith("local_file_"):
-                            st.info(f"📁 Tên file ảnh tải lên: {img_url.replace('local_file_', '')}")
-                            st.info("💡 Ảnh được lưu trữ tham chiếu trên thiết bị của bạn.")
+                            st.success(f"📁 Ảnh tải lên thiết bị: {img_url.replace('local_file_', '')}")
+                            st.info("💡 (Ảnh lưu tham chiếu cục bộ trên máy khách).")
                         else:
                             st.image(str(img_url), caption=f"Ảnh: {item_row.get('Ten_LK', '')}", width=280)
                     else:
@@ -913,7 +912,7 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên linh kiện/vật tư!")
-    # 7. NHẬP LINH KIỆN CŨ (QUÉT TOÀN DIỆN CẢ ĐỘC LẬP LẪN THÀNH PHẦN COMBO)
+    # 7. NHẬP LINH KIỆN CŨ
     elif menu_choice == "📥 Nhập linh kiện cũ":
         st.title("🔩 NHẬP BỔ SUNG LINH KIỆN / VẬT TƯ CŨ")
         render_code_guide()
@@ -925,7 +924,8 @@ with main_col:
             for _, r in df.iterrows():
                 m = r["Ma_LK"]
                 t = r["Ten_LK"]
-                kho = r.get("Kho_quan_ly", "Kho 1")
+                # Xử lý an toàn nếu thiếu cột Kho_quan_ly trên DB
+                kho = r["Kho_quan_ly"] if "Kho_quan_ly" in r and pd.notna(r["Kho_quan_ly"]) else "Kho 1"
                 dv = r["Don_vi"]
                 sl = r["So_luong"]
                 img = r.get("Hinh_anh", "")
@@ -954,10 +954,11 @@ with main_col:
                             sub_match_db = df[df["Ma_LK"] == sub_m]
                             if not sub_match_db.empty:
                                 db_row = sub_match_db.iloc[0]
+                                db_kho = db_row["Kho_quan_ly"] if "Kho_quan_ly" in db_row and pd.notna(db_row["Kho_quan_ly"]) else kho
                                 all_items_dict[sub_m] = {
                                     "Ma_LK": sub_m,
                                     "Ten_LK": db_row["Ten_LK"],
-                                    "Kho_quan_ly": db_row.get("Kho_quan_ly", kho),
+                                    "Kho_quan_ly": db_kho,
                                     "So_luong": db_row["So_luong"],
                                     "Don_vi": db_row["Don_vi"],
                                     "Hinh_anh": db_row.get("Hinh_anh", sub_img),
@@ -1058,7 +1059,7 @@ with main_col:
                     try:
                         ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
                         nguoi_thuc_hien = st.session_state.get("username", "Hệ thống")
-                        matched_db_lc = df[(df["Ma_LK"] == target_lc_code) & (df["Kho_quan_ly"] == kho_nhap_lc)]
+                        matched_db_lc = df[(df["Ma_LK"] == target_lc_code) & (df["Kho_quan_ly"] == kho_nhap_lc)] if "Kho_quan_ly" in df.columns else pd.DataFrame()
                         current_ton_lc = so_luong_thuc_te_lc
                         old_logs_lc = ""
                         if not matched_db_lc.empty:
