@@ -308,7 +308,7 @@ with main_col:
                 st.warning("Không tìm thấy dữ liệu nhật ký phù hợp.")
         else:
             st.info("Kho hiện đang trống.")
-    # 3. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO (ĐÃ HOÀN THIỆN UP ẢNH & LOAD ĐẦY ĐỦ)
+    # 3. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO (ĐÃ CÓ ĐỦ UPLOAD ẢNH CHO PHẦN 2)
     elif menu_choice == "✏️ Điều chỉnh thông tin & Giá Combo":
         st.title("✏️ ĐIỀU CHỈNH THÔNG TIN, GIÁ & THÀNH PHẦN COMBO")
         render_code_guide()
@@ -472,9 +472,18 @@ with main_col:
                         manual_e_def = old_code_e if old_code_e else auto_code_tp_e
                         final_tp_code_e = st.text_input(f"Mã linh kiện {i} (Cá nhân tự viết)", value=str(manual_e_def), key=f"ef_tp_{i}_ma")
                 with sub_c4:
-                    t_img_e = st.text_input(f"Link ảnh {i}", value=str(get_tp_val_e(i, 'img')), key=f"ef_tp_{i}_img")
-                with sub_c_bc:
                     t_barcode_e = st.text_input(f"Quét/Nhập Barcode linh kiện {i}", value=str(get_tp_val_e(i, 'barcode')), key=f"ef_tp_{i}_bc")
+                # Bổ sung khung upload ảnh cho từng linh kiện con ở phần điều chỉnh thông tin
+                sub_img_c1, sub_img_c2 = st.columns([1, 1])
+                with sub_img_c1:
+                    uploaded_sub_img_e = st.file_uploader(f"📁 Tải ảnh linh kiện {i}", type=["jpg", "jpeg", "png"], key=f"up_ef_tp_{i}_img")
+                with sub_img_c2:
+                    t_img_e = st.text_input(f"Hoặc dán Link ảnh linh kiện {i} (URL)", value=str(get_tp_val_e(i, 'img')), key=f"ef_tp_{i}_img")
+                if uploaded_sub_img_e is not None:
+                    t_img_e = f"local_file_{uploaded_sub_img_e.name}"
+                    st.image(uploaded_sub_img_e, width=80)
+                elif t_img_e and str(t_img_e).startswith("http"):
+                    st.image(str(t_img_e), width=80)
                 st.markdown("---")
                 tps_input_e.append({
                     "ten": t_name_e,
@@ -627,16 +636,23 @@ with main_col:
                 )
             prefix_tp = "LK" if "LK" in item_cat_tp else "VT"
             auto_code_tp = generate_code_from_name(t_name, is_combo=False, item_type=prefix_tp)
-            sub_c3, sub_c4, sub_c_bc = st.columns([2.5, 1.5, 2])
+            sub_c3, sub_c4 = st.columns([2.5, 2])
             with sub_c3:
                 if item_mode_tp.startswith("🤖"):
                     final_tp_code = st.text_input(f"Mã linh kiện {i} (Tự động từ hệ thống)", value=auto_code_tp, key=f"tp_{i}_show_auto", disabled=True)
                 else:
                     final_tp_code = st.text_input(f"Mã linh kiện {i} (Cá nhân tự viết)", key=tma_key)
             with sub_c4:
-                t_img = st.text_input(f"Link ảnh {i}", key=f"new_tp_{i}_img")
-            with sub_c_bc:
                 t_barcode = st.text_input(f"Quét/Nhập Barcode linh kiện {i}", key=f"new_tp_{i}_bc")
+            # Upload ảnh cho linh kiện con khi tạo mới Combo
+            sub_img_c1, sub_img_c2 = st.columns([1, 1])
+            with sub_img_c1:
+                uploaded_sub_img = st.file_uploader(f"📁 Tải ảnh linh kiện {i}", type=["jpg", "jpeg", "png"], key=f"up_new_tp_{i}_img")
+            with sub_img_c2:
+                t_img = st.text_input(f"Hoặc dán Link ảnh linh kiện {i} (URL)", key=f"new_tp_{i}_img")
+            if uploaded_sub_img is not None:
+                t_img = f"local_file_{uploaded_sub_img.name}"
+                st.image(uploaded_sub_img, width=80)
             st.markdown("---")
             tps_input.append({
                 "ten": t_name,
@@ -682,7 +698,7 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
-    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ FIX LỖI LOAD GIÁ & ĐỒNG BỘ CHÍNH XÁC)
+    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ FIX LOAD ĐẦY ĐỦ GIÁ NHẬP & GIÁ XUẤT)
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         render_code_guide()
@@ -730,7 +746,7 @@ with main_col:
             st.session_state.f_gx = 0
             st.session_state.f_bc = ""
             st.session_state.f_qc = 1
-        # Cập nhật state chính xác khi chọn dữ liệu cũ hoặc quét barcode
+        # Cập nhật state chính xác khi chọn dữ liệu cũ hoặc quét barcode (bao gồm cả giá)
         if selected_row_data:
             st.session_state.f_ten = selected_row_data.get("Ten_LK", "")
             st.session_state.f_ma = selected_row_data.get("Ma_LK", "")
