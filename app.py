@@ -34,7 +34,6 @@ def load_data():
     try:
         response = supabase.table("Ton_kho").select("*").execute()
         df_load = pd.DataFrame(response.data)
-        # Đảm bảo có cột Kho_quan_ly nếu dữ liệu cũ chưa có (mặc định Kho 1)
         if not df_load.empty and "Kho_quan_ly" not in df_load.columns:
             df_load["Kho_quan_ly"] = "Kho 1"
         return df_load
@@ -42,6 +41,8 @@ def load_data():
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
 df = load_data()
+# Định danh danh sách kho từ Kho 1 đến Kho 10
+danh_sach_kho_mac_dinh = [f"Kho {i}" for i in range(1, 11)]
 # Hàm định dạng tiền tệ chuẩn kế toán Việt Nam
 def format_money(val):
     try:
@@ -78,14 +79,14 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     clean_code = re.sub(r'_+', '_', clean_code).strip('_')
     auto_code = f"{prefix}-{clean_code[:30]}"
     return auto_code.replace("__", "_").upper()
-# Widget hiển thị Hướng dẫn tạo mã dùng chung
+# Widget Hướng dẫn quy tắc tạo mã
 def render_code_guide():
     with st.expander("💡 HƯỚNG DẪN QUY TẮC TẠO MÃ SẢN PHẨM & COMBO"):
         st.markdown("""
         - **Mã Combo (`CB-`)**: Hệ thống tự động gom từ viết tắt của tên Combo (VD: *Bộ bàn ghế phòng khách* $\rightarrow$ `CB-BO_BAN_GHE`).
         - **Mã Vật Tư (`VT-`)**: Dùng cho các vật tư tiêu hao, bu lông, ốc vít (VD: *Bulong M24* $\rightarrow$ `VT-BL_M24`).
         - **Mã Linh Kiện (`LK-`)**: Dùng cho các linh kiện thiết bị, máy móc (VD: *Mô tơ cửa cuốn* $\rightarrow$ `LK-MO_TO_CUA_CUON`).
-        - Bạn có thể chọn chế độ **✍️ Tự viết** nếu muốn tự đặt mã theo quy ước riêng của doanh nghiệp.
+        - Bạn có thể chọn chế độ **✍️ Tự viết** nếu muốn tự đặt mã theo quy ước riêng.
         """)
 # Quản lý đăng nhập
 if "logged_in" not in st.session_state:
@@ -112,13 +113,8 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-# --- DANH SÁCH KHO TỪ KHO 1 ĐẾN KHO 10 ---
-danh_sach_kho_mac_dinh = [f"Kho {i}" for i in range(1, 11)]
-# --- MENU ĐIỀU HƯỚNG BÊN TRÁI ---
+# --- MENU ĐIỀU HƯỚNG BÊN TRÁI (ĐÃ BỎ MỤC CHỌN KHO) ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.role}")
-st.sidebar.markdown("---")
-st.sidebar.subheader("🏢 Lựa Chọn Kho Quản Lý")
-selected_warehouse = st.sidebar.selectbox("📂 Chọn kho làm việc:", ["🌐 Xem tất cả các kho"] + danh_sach_kho_mac_dinh)
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
 menu_choice = st.sidebar.radio(
@@ -141,56 +137,109 @@ if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.role = None
     st.session_state.username = None
     st.rerun()
-# Lọc DataFrame theo kho được chọn từ sidebar
-df_hien_tai = df.copy()
-if selected_warehouse != "🌐 Xem tất cả các kho" and not df_hien_tai.empty:
-    if "Kho_quan_ly" in df_hien_tai.columns:
-        df_hien_tai = df_hien_tai[df_hien_tai["Kho_quan_ly"] == selected_warehouse]
 # --- GIAO DIỆN CHÍNH BÊN PHẢI ---
 _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
     # 1. TỔNG QUAN TỒN KHO
     if menu_choice == "📊 Tổng quan tồn kho":
-        st.title(f"📦 TỒN KHO HỆ THỐNG — [{selected_warehouse.upper()}]")
-        if not df_hien_tai.empty:
-            df_filtered = df_hien_tai[df_hien_tai["So_luong"] >= 0].copy()
+        # Ô chọn kho di chuyển sang bên phải giao diện chính
+        col_title, col_select_k = st.columns([2.5, 1.5])
+        with col_select_k:
+            selected_warehouse = st.selectbox(
+                "🏢 Chọn kho xem tồn kho:", 
+                ["🌐 Xem tất cả các kho"] + danh_sach_kho_mac_dinh,
+                key="main_wh_select"
+            )
+        with col_title:
+            st.title(f"📦 TỒN KHO HỆ THỐNG")
+        st.markdown("---")
+        if not df.empty:
+            df_working = df.copy()
             for col_check in ["Gia_nhap", "Gia_xuat", "Barcode", "Quy_cach", "So_luong", "Kho_quan_ly"]:
-                if col_check not in df_filtered.columns:
-                    df_filtered[col_check] = "Kho 1" if col_check == "Kho_quan_ly" else (1 if col_check == "Quy_cach" else (0 if "Gia" in col_check or col_check == "So_luong" else ""))
-            df_filtered["Thanh_tien"] = pd.to_numeric(df_filtered["So_luong"], errors="coerce").fillna(0) * pd.to_numeric(df_filtered["Gia_nhap"], errors="coerce").fillna(0)
-            tong_gia_tri_kho = df_filtered["Thanh_tien"].sum()
-            tong_so_luong = int(df_filtered["So_luong"].sum())
-            col_m1, col_m2, col_m3 = st.columns([2, 2, 3])
-            with col_m1:
-                st.metric(label="📊 TỔNG MẶT HÀNG", value=f"{len(df_filtered)} sản phẩm")
-            with col_m2:
-                st.metric(label="📦 TỔNG SỐ LƯỢNG", value=f"{format_money(tong_so_luong)} đơn vị")
-            with col_m3:
-                st.metric(label="💰 TỔNG GIÁ TRỊ TỒN KHO", value=f"{format_money(tong_gia_tri_kho)} VNĐ")
-            st.markdown("---")
-            df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
-            df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
-            df_display = df_filtered[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]].copy()
-            df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Kho quản lý", "Tồn kho", "Đơn vị", "Quy cách", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch"]
-            st.dataframe(df_display, use_container_width=True, height=500)
+                if col_check not in df_working.columns:
+                    df_working[col_check] = "Kho 1" if col_check == "Kho_quan_ly" else (1 if col_check == "Quy_cach" else (0 if "Gia" in col_check or col_check == "So_luong" else ""))
+            df_working["So_luong"] = pd.to_numeric(df_working["So_luong"], errors="coerce").fillna(0)
+            df_working["Gia_nhap"] = pd.to_numeric(df_working["Gia_nhap"], errors="coerce").fillna(0)
+            if selected_warehouse != "🌐 Xem tất cả các kho":
+                # Lọc đúng theo kho chọn
+                df_filtered = df_working[df_working["Kho_quan_ly"] == selected_warehouse].copy()
+                df_filtered["Thanh_tien"] = df_filtered["So_luong"] * df_filtered["Gia_nhap"]
+                tong_gia_tri_kho = df_filtered["Thanh_tien"].sum()
+                tong_so_luong = int(df_filtered["So_luong"].sum())
+                col_m1, col_m2, col_m3 = st.columns([2, 2, 3])
+                with col_m1:
+                    st.metric(label="📊 TỔNG MẶT HÀNG IN KHO", value=f"{len(df_filtered)} sản phẩm")
+                with col_m2:
+                    st.metric(label="📦 TỔNG SỐ LƯỢNG TỒN", value=f"{format_money(tong_so_luong)} đơn vị")
+                with col_m3:
+                    st.metric(label="💰 TỔNG GIÁ TRỊ TỒN KHO", value=f"{format_money(tong_gia_tri_kho)} VNĐ")
+                st.markdown("---")
+                df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
+                df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
+                df_display = df_filtered[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]].copy()
+                df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Kho quản lý", "Tồn kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
+                st.dataframe(df_display, use_container_width=True, height=500)
+            else:
+                # XEM TẤT CẢ CÁC KHO: Gom nhóm theo Mã sản phẩm & Cộng dồn tồn kho
+                def aggregate_stock(group):
+                    ten_lk = group["Ten_LK"].iloc[0]
+                    don_vi = group["Don_vi"].iloc[0]
+                    quy_cach = group["Quy_cach"].iloc[0]
+                    gia_nhap = group["Gia_nhap"].iloc[0]
+                    gia_xuat = group["Gia_xuat"].iloc[0]
+                    barcode = group["Barcode"].iloc[0]
+                    tong_ton = int(group["So_luong"].sum())
+                    # Tạo chuỗi chi tiết kho (VD: Kho 1 tồn 10, Kho 2 tồn 5)
+                    chi_tiet_kho_list = []
+                    for _, r in group.iterrows():
+                        if r["So_luong"] > 0:
+                            chi_tiet_kho_list.append(f"{r['Kho_quan_ly']} tồn {int(r['So_luong'])}")
+                    chi_tiet_kho_str = ", ".join(chi_tiet_kho_list) if chi_tiet_kho_list else "Hết hàng ở các kho"
+                    return pd.Series({
+                        "Ten_LK": ten_lk,
+                        "Chi_tiet_kho": chi_tiet_kho_str,
+                        "Tong_ton": tong_ton,
+                        "Don_vi": don_vi,
+                        "Quy_cach": quy_cach,
+                        "Gia_nhap": gia_nhap,
+                        "Gia_xuat": gia_xuat,
+                        "Barcode": barcode,
+                        "Thanh_tien": tong_ton * gia_nhap
+                    })
+                df_grouped = df_working.groupby("Ma_LK", as_index=False).apply(aggregate_stock)
+                tong_gia_tri_kho = df_grouped["Thanh_tien"].sum()
+                tong_so_luong = int(df_grouped["Tong_ton"].sum())
+                col_m1, col_m2, col_m3 = st.columns([2, 2, 3])
+                with col_m1:
+                    st.metric(label="📊 TỔNG MẶT HÀNG TỔNG CỘNG", value=f"{len(df_grouped)} sản phẩm")
+                with col_m2:
+                    st.metric(label="📦 TỔNG SỐ LƯỢNG TỒN (TẤT CẢ KHO)", value=f"{format_money(tong_so_luong)} đơn vị")
+                with col_m3:
+                    st.metric(label="💰 TỔNG GIÁ TRỊ TỒN KHO", value=f"{format_money(tong_gia_tri_kho)} VNĐ")
+                st.markdown("---")
+                df_grouped["Gia_nhap_fmt"] = df_grouped["Gia_nhap"].apply(format_money)
+                df_grouped["Gia_xuat_fmt"] = df_grouped["Gia_xuat"].apply(format_money)
+                df_display = df_grouped[["Ma_LK", "Ten_LK", "Chi_tiet_kho", "Tong_ton", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt", "Barcode"]].copy()
+                df_display.columns = ["Mã sản phẩm", "Tên sản phẩm", "Chi tiết tồn từng kho", "Tổng tồn các kho", "Đơn vị cơ bản", "Quy cách (SL/Kiện)", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)", "Mã vạch (Barcode)"]
+                st.dataframe(df_display, use_container_width=True, height=500)
         else:
-            st.info(f"Kho **{selected_warehouse}** hiện đang trống. Hãy chọn kho khác hoặc thêm sản phẩm mới!")
+            st.info("Kho hiện đang trống. Hãy thêm sản phẩm mới!")
     # 2. TRA CỨU & LỌC CHI TIẾT
     elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
-        st.title(f"🔍 TRA CỨU & LỌC CHI TIẾT — [{selected_warehouse.upper()}]")
+        st.title("🔍 TRA CỨU & LỌC CHI TIẾT SẢN PHẨM")
         st.markdown("---")
-        if not df_hien_tai.empty:
+        if not df.empty:
             col_sc1, col_sc2 = st.columns([2, 2])
             with col_sc1:
                 barcode_search = st.text_input("🪪 Quét / Nhập mã vạch (Barcode) để tra cứu nhanh", placeholder="Nhấn vào đây rồi quét mã vạch...")
             target_ma_lk = None
             if barcode_search.strip():
-                matched_bc = df_hien_tai[df_hien_tai["Barcode"].str.contains(barcode_search.strip(), case=False, na=False)]
+                matched_bc = df[df["Barcode"].str.contains(barcode_search.strip(), case=False, na=False)]
                 if not matched_bc.empty:
                     target_ma_lk = matched_bc.iloc[0]["Ma_LK"]
                     st.success(f"✨ Đã tìm thấy sản phẩm qua mã vạch: **{matched_bc.iloc[0]['Ten_LK']}** (`{target_ma_lk}`)")
                 else:
-                    st.warning("⚠️ Không tìm thấy sản phẩm nào khớp với mã vạch này trong kho hiện tại.")
+                    st.warning("⚠️ Không tìm thấy sản phẩm nào khớp với mã vạch này.")
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
                 loai_loc = st.selectbox(
@@ -198,21 +247,23 @@ with main_col:
                     ["Tất cả", "📥 Nhập kho", "📤 Xuất kho", "🔄 Cập nhật thông tin"]
                 )
             with col_f2:
-                ma_list = df_hien_tai["Ma_LK"].tolist()
+                ma_list = df["Ma_LK"].unique().tolist()
                 default_idx = ma_list.index(target_ma_lk) if target_ma_lk in ma_list else 0
                 selected_item = st.selectbox("Chọn mã linh kiện", ma_list, index=default_idx) if ma_list else None
             with col_f3:
                 bat_tat_ngay = st.checkbox("Lọc theo ngày cụ thể")
                 ngay_chon = st.date_input("Chọn ngày", value=date.today())
             if selected_item:
-                item_row = df_hien_tai[df_hien_tai["Ma_LK"] == selected_item].iloc[0]
+                item_row = df[df["Ma_LK"] == selected_item].iloc[0]
                 st.markdown("### 📄 Thông tin chi tiết sản phẩm / Combo")
                 col_info1, col_info2 = st.columns(2)
                 with col_info1:
-                    st.write(f"**🏢 Kho quản lý:** {item_row.get('Kho_quan_ly', 'Kho 1')}")
                     st.write(f"**Mã LK/VT/CB:** {item_row.get('Ma_LK', '')}")
                     st.write(f"**Tên:** {item_row.get('Ten_LK', '')}")
-                    st.write(f"**Số lượng tồn:** {item_row.get('So_luong', '')} {item_row.get('Don_vi', '')}")
+                    # Hiển thị tồn kho phân theo từng kho
+                    matched_item_all = df[df["Ma_LK"] == selected_item]
+                    stock_detail_str = ", ".join([f"{r['Kho_quan_ly']}: {r['So_luong']} {r['Don_vi']}" for _, r in matched_item_all.iterrows()])
+                    st.write(f"**📦 Phân bổ tồn kho:** {stock_detail_str}")
                     st.write(f"**📦 Quy cách đóng gói:** 1 Kiện = {item_row.get('Quy_cach', 1)} {item_row.get('Don_vi', 'Cái')}")
                     st.write(f"**💰 Giá nhập:** {format_money(item_row.get('Gia_nhap', 0))} VNĐ")
                     st.write(f"**🏷️ Giá xuất:** {format_money(item_row.get('Gia_xuat', 0))} VNĐ")
@@ -227,7 +278,7 @@ with main_col:
                             sub_dv = tp.get('dv', 'Cái')
                             sub_gia = tp.get('gia', 0)
                             sub_img = tp.get('img', '')
-                            sub_match = df_hien_tai[df_hien_tai["Ma_LK"] == sub_m]
+                            sub_match = df[df["Ma_LK"] == sub_m]
                             if not sub_name and not sub_match.empty:
                                 sub_name = sub_match.iloc[0]["Ten_LK"]
                             gia_str = f" | Giá: **{format_money(sub_gia)} VNĐ**" if sub_gia else ""
@@ -241,7 +292,7 @@ with main_col:
                     else:
                         st.info("Chưa có link hình ảnh.")
             st.markdown("### 📋 NHẬT KÝ KHO")
-            filtered_df = df_hien_tai.copy()
+            filtered_df = df.copy()
             if loai_loc != "Tất cả":
                 keyword_map = {
                     "📥 Nhập kho": "Nhập kho",
@@ -255,7 +306,7 @@ with main_col:
                 filtered_df = filtered_df[filtered_df["Nhat_ky"].str.contains(format_ngay, na=False)]
                 st.info(f"Đang lọc ngày: **{format_ngay}** | Hạng mục: **{loai_loc}**")
             if not filtered_df.empty:
-                st.dataframe(filtered_df[["Ma_LK", "Ten_LK", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True)
+                st.dataframe(filtered_df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Nhat_ky"]], use_container_width=True)
             else:
                 st.warning("Không tìm thấy dữ liệu nhật ký phù hợp.")
         else:
@@ -464,7 +515,7 @@ with main_col:
                     st.warning("Vui lòng bấm nút 'Nạp dữ liệu cũ lên Form' trước khi lưu!")
     # 4. NHẬP MỚI COMBO
     elif menu_choice == "📥 Nhập mới Combo":
-        st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẦN")
+        st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
         render_code_guide()
         st.markdown("---")
         c1, c2 = st.columns(2)
@@ -1137,7 +1188,7 @@ with main_col:
             time_stamp = datetime.now().strftime("%Y%m%d_%H%M")
             col_rep1, col_rep2 = st.columns(2)
             with col_rep1:
-                st.metric("Tổng số mặt hàng / Combo", len(df))
+                st.metric("Tổng số mặt hàng / Combo", len(df["Ma_LK"].unique()))
                 st.metric("Tổng lượng kho", int(df["So_luong"].sum()) if "So_luong" in df else 0)
             with col_rep2:
                 st.download_button(
