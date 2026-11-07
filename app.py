@@ -185,7 +185,7 @@ with main_col:
             col_pos1, col_pos2 = st.columns([1.5, 2.5])
             with col_pos1:
                 st.subheader("🔍 Chọn sản phẩm & Quét mã")
-                # Quét ảnh QR an toàn tuyệt đối bằng pyzbar (không dùng cv2 gây lỗi)
+                # Quét ảnh QR an toàn tuyệt đối bằng pyzbar
                 img_qr_scan = st.file_uploader("📷 CHỤP ẢNH / TẢI ẢNH MÃ QR ĐỂ QUÉT NHANH", type=["jpg", "jpeg", "png"], key="pos_qr_img_upload")
                 scanned_from_image = None
                 if img_qr_scan is not None:
@@ -210,7 +210,15 @@ with main_col:
                 if active_scan_code:
                     if active_scan_code in all_sellable_items:
                         selected_code_pos = active_scan_code
-                        st.success(f"✨ Đã nhận diện sản phẩm: **{all_sellable_items[active_scan_code]['Ten_LK']}**")
+                        # Hiển thị trực quan thông tin sản phẩm vừa quét ngay bên dưới
+                        scanned_info = all_sellable_items[active_scan_code]
+                        st.success(f"🎯 **ĐÃ TÌM THẤY SẢN PHẨM QUA MÃ QUÉT:**")
+                        st.markdown(f"""
+                        - 🏷️ **Tên sản phẩm:** `{scanned_info['Ten_LK']}`
+                        - 🏢 **Đang ở kho:** `{scanned_info['Kho_quan_ly']}`
+                        - 📦 **Số lượng tồn:** `{scanned_info['So_luong']} {scanned_info['Don_vi']}`
+                        - 💰 **Giá bán:** `{format_money(scanned_info['Gia_xuat'])} VNĐ / {scanned_info['Don_vi']}`
+                        """)
                     else:
                         st.warning(f"⚠️ Mã `{active_scan_code}` không tồn tại trong kho bán hàng.")
                 options_pos = [f"{m} - {info['Ten_LK']} (Tồn: {info['So_luong']} {info['Don_vi']} | Giá: {format_money(info['Gia_xuat'])}đ)" for m, info in all_sellable_items.items()]
@@ -757,7 +765,7 @@ with main_col:
             else:
                 ma_lk = st.text_input("Mã QR Combo (Tự viết)", value=auto_cb_code, key="new_cb_manualcode")
             kho_nhap_cb = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, key="new_cb_kho")
-            don_vi = st.selectbox("Don vị tính cơ bản của Combo", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
+            don_vi = st.selectbox("Đơn vị tính cơ bản của Combo", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
             hinh_thuc_nhap_cb = st.radio(
                 "Hình thức nhập kho:",
                 ["📐 Nhập theo đơn vị lẻ", "📦 Nhập theo Kiện (Thùng)"],
@@ -1668,21 +1676,4 @@ with main_col:
                 df_ton_kho = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach"]].copy()
                 df_ton_kho.columns = ["Mã QR Sản Phẩm / Combo", "Tên Sản Phẩm", "Kho Quản Lý", "Số Lượng Tồn Kho", "Đơn Vị Tính", "Quy Cách (SL/Kiện)"]
                 df_ton_kho.to_excel(writer, sheet_name='Ton_Kho_Hien_Tai', index=False)
-                df_nhat_ky = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Nhat_ky"]].copy()
-                df_nhat_ky.columns = ["Mã QR Sản Phẩm", "Tên Sản Phẩm", "Kho Quản Lý", "Lịch Sử Nhật Ký Chi Tiết"]
-                df_nhat_ky.to_excel(writer, sheet_name='Lich_Su_Nhat_Ky', index=False)
-            excel_data = output.getvalue()
-            time_stamp = datetime.now().strftime("%Y%m%d_%H%M")
-            col_rep1, col_rep2 = st.columns(2)
-            with col_rep1:
-                st.metric("Tổng số mặt hàng / Combo", len(df["Ma_LK"].unique()))
-                st.metric("Tổng lượng kho", int(df["So_luong"].sum()) if "So_luong" in df else 0)
-            with col_rep2:
-                st.download_button(
-                    label="📥 Tải Báo Cáo Kho Dạng Excel (.xlsx)",
-                    data=excel_data,
-                    file_name=f"Bao_Cao_Da_Kho_{time_stamp}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-        else:
-            st.warning("Kho hiện đang trống!")
+Names = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Nhat_ky"]].copy()
