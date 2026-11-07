@@ -678,7 +678,7 @@ with main_col:
                     st.error(f"Lỗi khi lưu dữ liệu: {e}")
             else:
                 st.warning("Vui lòng điền đầy đủ Mã và Tên Combo!")
-    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ BỎ Ô CẬP NHẬT THÔNG TIN, TỰ ĐỘNG LOAD FULL THÔNG TIN & GIÁ)
+    # 5. NHẬP MỚI LINH KIỆN LẺ (ĐÃ FIX LỖI ĐỒNG BỘ DỮ LIỆU CŨ CHÍNH XÁC)
     elif menu_choice == "📥 Nhập mới Linh kiện lẻ":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         render_code_guide()
@@ -708,13 +708,13 @@ with main_col:
             selected_row_data = matched_item_by_bc
         elif thao_tac_nhap == "📂 Load lại dữ liệu cũ" and item_dict:
             selected_existing_str = st.selectbox(
-                "🔍 Nhập / Chọn mã hoặc tên linh kiện cũ cần load:", 
+                "🔍 Chọn mã hoặc tên linh kiện cũ cần load:", 
                 ["-- Chọn linh kiện cũ --"] + list(item_dict.keys()),
                 key="le_selectbox_old"
             )
             if selected_existing_str != "-- Chọn linh kiện cũ --":
                 selected_row_data = item_dict[selected_existing_str]
-        # Khởi tạo session state lưu giá trị form
+        # Khởi tạo session state
         if "le_form_init" not in st.session_state:
             st.session_state.le_form_init = True
             st.session_state.f_ten = ""
@@ -726,7 +726,7 @@ with main_col:
             st.session_state.f_gx = 0
             st.session_state.f_bc = ""
             st.session_state.f_qc = 1
-        # Nếu chọn load dữ liệu cũ hoặc quét barcode -> Tự điền toàn bộ thông tin & giá
+        # Cập nhật state khi chọn dữ liệu cũ
         if selected_row_data:
             st.session_state.f_ten = selected_row_data.get("Ten_LK", "")
             st.session_state.f_ma = selected_row_data.get("Ma_LK", "")
@@ -737,9 +737,11 @@ with main_col:
             st.session_state.f_gx = int(selected_row_data.get("Gia_xuat", 0)) if pd.notna(selected_row_data.get("Gia_xuat")) else 0
             st.session_state.f_bc = selected_row_data.get("Barcode", "") if selected_row_data.get("Barcode") else ""
             st.session_state.f_qc = int(selected_row_data.get("Quy_cach", 1)) if pd.notna(selected_row_data.get("Quy_cach")) else 1
-        elif thao_tac_nhap == "✨ Nhập mới hoàn toàn":
-            # Nếu chọn nhập mới, có thể reset hoặc giữ để user tự điền
-            pass
+        elif thao_tac_nhap == "✨ Nhập mới hoàn toàn" and not matched_item_by_bc:
+            # Nếu bấm nhập mới hoàn toàn thì xóa dữ liệu cũ để trống
+            if "le_selectbox_old" in st.session_state and st.session_state["le_selectbox_old"] != "-- Chọn linh kiện cũ --":
+                st.session_state.f_ten = ""
+                st.session_state.f_ma = ""
         c1, c2 = st.columns(2)
         with c1:
             ten_lk = st.text_input(
@@ -768,16 +770,16 @@ with main_col:
                 )
             prefix_type_le = "LK" if "LK" in item_cat_le else "VT"
             auto_code_le = generate_code_from_name(ten_lk, is_combo=False, item_type=prefix_type_le)
-            # Nếu load dữ liệu cũ thì ưu tiên hiển thị mã cũ, nếu nhập mới thì tự sinh theo tên
-            if thao_tac_nhap == "📂 Load lại dữ liệu cũ" and st.session_state.f_ma:
-                default_code_display = st.session_state.f_ma
+            # Đồng bộ chính xác mã sản phẩm
+            if thao_tac_nhap == "📂 Load lại dữ liệu cũ" and st.session_state.f_ten == ten_lk and st.session_state.f_ma:
+                final_code_value = st.session_state.f_ma
             else:
-                default_code_display = auto_code_le
+                final_code_value = auto_code_le
             if item_method_le.startswith("🤖"):
-                ma_lk = st.text_input("Mã LK / VT (Tự động từ hệ thống)", value=default_code_display, key="le_code_auto_show")
+                ma_lk = st.text_input("Mã LK / VT (Tự động từ hệ thống)", value=final_code_value, key="le_code_auto_show")
             else:
-                ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=default_code_display, key="le_code_manual_show")
-                st.session_state.f_ma = ma_lk
+                ma_lk = st.text_input("Mã LK / VT (Cá nhân tự viết)", value=final_code_value, key="le_code_manual_show")
+            st.session_state.f_ma = ma_lk
             dv_list_le = ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Mét", "Bộ"]
             current_dv = st.session_state.f_dv
             dv_idx = dv_list_le.index(current_dv) if current_dv in dv_list_le else 0
