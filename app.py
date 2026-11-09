@@ -134,12 +134,12 @@ if not st.session_state.logged_in:
             elif username_input in ["MINH", "nv1"] and password == "123456":
                 st.session_state.logged_in = True
                 st.session_state.role = "ĐỖ HỮU MINH"
-                st.session_state.username = "Nhân viên An (Kho 1)"
+                st.session_state.username = "ĐỖ HỮU MINH"
                 st.rerun()
             elif username_input in ["TRUNG", "nv1_phu"] and password == "123456":
                 st.session_state.logged_in = True
                 st.session_state.role = "TRƯƠNG MẬU TRUNG"
-                st.session_state.username = "Nhân viên Bình (Kho 1)"
+                st.session_state.username = "TRƯƠNG MẬU TRUNG"
                 st.rerun()
             elif username_input == "nv_kho2" and password == "123456":
                 st.session_state.logged_in = True
