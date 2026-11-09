@@ -137,7 +137,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-# --- MENU BÊN TRÁI ---
+# --- MENU BÊN TRÁI ĐÃ SẮP XẾP LẠI THỨ TỰ ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.username}")
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
@@ -145,10 +145,7 @@ menu_choice = st.sidebar.radio(
     "Chọn chức năng:",
     [
         "🛍️ Bán hàng & In hóa đơn (POS)",
-        "📊 Báo cáo Doanh thu & Lợi nhuận",
-        "📝 Quản lý Công nợ",
-        "⚠️ Cảnh báo tồn kho",
-        "📦 Tổng quan tồn kho", 
+        "📊 Tổng quan tồn kho", 
         "🔍 Tra cứu & Lọc chi tiết", 
         "✏️ Điều chỉnh thông tin & Giá Combo",
         "📥 Nhập Combo mới", 
@@ -158,6 +155,9 @@ menu_choice = st.sidebar.radio(
         "🔄 Xé lẻ Combo thành Linh kiện", 
         "📤 Xuất kho Combo", 
         "📤 Xuất kho Linh kiện lẻ",
+        "📊 Báo cáo Doanh thu & Lợi nhuận",
+        "📝 Quản lý Công nợ",
+        "⚠️ Cảnh báo tồn kho",
         "📈 Báo cáo & Xuất Excel"
     ]
 )
@@ -254,7 +254,6 @@ with main_col:
                                         if ghi_chu_don: log_str += f" | Ghi chú: {ghi_chu_don}"
                                         if old_logs: log_str = old_logs + "\n" + log_str
                                         supabase.table("Ton_kho").update({"So_luong": ton_moi, "Nhat_ky": log_str}).eq("Ma_LK", m_lk).eq("Kho_quan_ly", kho).execute()
-                                # Lưu thông tin hóa đơn vừa thanh toán để in
                                 st.session_state.last_invoice = {
                                     "ma_hd": f"HD{datetime.now().strftime('%Y%m%d%H%M%S')}",
                                     "ngay": ngay_gio_hien_tai,
@@ -270,7 +269,6 @@ with main_col:
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Lỗi thanh toán: {e}")
-        # GIAO DIỆN IN HÓA ĐƠN KHI THANH TOÁN XONG
         if st.session_state.last_invoice:
             st.markdown("---")
             st.subheader("📄 HÓA ĐƠN BÁN HÀNG VỪA TẠO")
@@ -290,7 +288,40 @@ with main_col:
                 df_inv_items["Đơn giá (VNĐ)"] = df_inv_items["Gia_xuat"].apply(format_money)
                 st.dataframe(df_inv_items[["Ma_LK", "Ten_LK", "So_luong_mua", "Don_vi", "Đơn giá (VNĐ)", "Thành tiền (VNĐ)"]], use_container_width=True)
                 st.markdown(f"#### **Tổng cộng thanh toán:** `{format_money(inv['tong_tien'])} VNĐ`")
-    # 2. BÁO CÁO DOANH THU & LỢI NHUẬN
+    # 2. TỔNG QUAN TỒN KHO
+    elif menu_choice == "📊 Tổng quan tồn kho":
+        st.title("📦 TỒN KHO HỆ THỐNG")
+        st.dataframe(df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi"]], use_container_width=True)
+    # 3. TRA CỨU & LỌC CHI TIẾT
+    elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
+        st.title("🔍 TRA CỨU & LỌC CHI TIẾT")
+        st.dataframe(df, use_container_width=True)
+    # 4. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO
+    elif menu_choice == "✏️ Điều chỉnh thông tin & Giá Combo":
+        st.title("✏️ ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO")
+        st.info("Sử dụng form chỉnh sửa thông tin chi tiết.")
+    # 5. NHẬP COMBO MỚI
+    elif menu_choice == "📥 Nhập Combo mới":
+        st.title("📥 NHẬP COMBO MỚI")
+    # 6. NHẬP COMBO CŨ
+    elif menu_choice == "📥 Nhập Combo cũ":
+        st.title("📥 NHẬP COMBO CŨ")
+    # 7. NHẬP LINH KIỆN MỚI
+    elif menu_choice == "📥 Nhập linh kiện mới":
+        st.title("📥 NHẬP LINH KIỆN MỚI")
+    # 8. NHẬP LINH KIỆN CŨ
+    elif menu_choice == "📥 Nhập linh kiện cũ":
+        st.title("📥 NHẬP LINH KIỆN CŨ")
+    # 9. XÉ LẺ COMBO THÀNH LINH KIỆN
+    elif menu_choice == "🔄 Xé lẻ Combo thành Linh kiện":
+        st.title("🔄 XÉ LẺ COMBO THÀNH LINH KIỆN")
+    # 10. XUẤT KHO COMBO
+    elif menu_choice == "📤 Xuất kho Combo":
+        st.title("📤 XUẤT KHO COMBO")
+    # 11. XUẤT KHO LINH KIỆN LẺ
+    elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
+        st.title("📤 XUẤT KHO LINH KIỆN LẺ")
+    # 12. BÁO CÁO DOANH THU & LỢI NHUẬN
     elif menu_choice == "📊 Báo cáo Doanh thu & Lợi nhuận":
         st.title("📊 BÁO CÁO DOANH THU & LỢI NHUẬN BÁN HÀNG")
         st.markdown("---")
@@ -326,7 +357,6 @@ with main_col:
                             pass
             if sales_records:
                 df_sales = pd.DataFrame(sales_records)
-                # Tổng quan dạng số
                 tong_doanh_thu = df_sales["Doanh thu"].sum()
                 tong_von = df_sales["Tiền vốn"].sum()
                 tong_loi_nhuan = df_sales["Lợi nhuận"].sum()
@@ -337,22 +367,18 @@ with main_col:
                 m3.metric("📈 LỢI NHUẬN GỘP", f"{format_money(tong_loi_nhuan)} VNĐ")
                 m4.metric("🛒 SỐ ĐƠN BÁN RA", f"{tong_don} đơn")
                 st.markdown("---")
-                st.subheader("📉 Biểu Đồ Thống Kê")
                 c_chart1, c_chart2 = st.columns(2)
                 with c_chart1:
-                    st.write("**Doanh thu & Lợi nhuận theo sản phẩm**")
-                    chart_data = df_sales.groupby("Tên sản phẩm")[["Doanh thu", "Lợi nhuận"]].sum()
-                    st.bar_chart(chart_data)
+                    st.write("**Doanh thu theo sản phẩm**")
+                    st.bar_chart(df_sales.groupby("Tên sản phẩm")["Doanh thu"].sum())
                 with c_chart2:
-                    st.write("**Tỷ trọng hình thức thanh toán**")
-                    tt_data = df_sales.groupby("Hình thức TT")["Doanh thu"].sum()
-                    st.bar_chart(tt_data)
+                    st.write("**Tỷ trọng thanh toán**")
+                    st.bar_chart(df_sales.groupby("Hình thức TT")["Doanh thu"].sum())
                 st.markdown("---")
-                st.subheader("📋 Chi tiết danh sách lịch sử bán hàng")
                 st.dataframe(df_sales, use_container_width=True)
             else:
-                st.info("Chưa có dữ liệu bán hàng POS nào được ghi nhận.")
-    # 3. QUẢN LÝ CÔNG NỢ KHÁCH HÀNG
+                st.info("Chưa có dữ liệu bán hàng POS nào.")
+    # 13. QUẢN LÝ CÔNG NỢ
     elif menu_choice == "📝 Quản lý Công nợ":
         st.title("📝 QUẢN LÝ CÔNG NỢ KHÁCH HÀNG")
         st.markdown("---")
@@ -367,71 +393,55 @@ with main_col:
                         time_match = re.search(r'\[(.*?)\]', line)
                         sl_match = re.search(r': -(\d+)', line)
                         gx_match = re.search(r'Giá xuất: (\d+\.?\d*)', line)
-                        ten_k = khach_match.group(1) if khach_match else "Khách nợ"
-                        sdt_k = sdt_match.group(1) if sdt_match else "---"
-                        t_k = time_match.group(1) if time_match else ""
-                        sl = int(sl_match.group(1)) if sl_match else 1
-                        gx = float(gx_match.group(1)) if gx_match else float(r.get("Gia_xuat", 0))
                         debt_records.append({
-                            "Ngày nợ": t_k,
-                            "Khách hàng": ten_k,
-                            "SĐT": sdt_k,
+                            "Ngày nợ": time_match.group(1) if time_match else "",
+                            "Khách hàng": khach_match.group(1) if khach_match else "Khách nợ",
+                            "SĐT": sdt_match.group(1) if sdt_match else "---",
                             "Sản phẩm nợ": r["Ten_LK"],
-                            "Số tiền nợ (VNĐ)": sl * gx,
+                            "Số tiền nợ (VNĐ)": (int(sl_match.group(1)) if sl_match else 1) * (float(gx_match.group(1)) if gx_match else float(r.get("Gia_xuat", 0))),
                             "Mã SP": r["Ma_LK"],
                             "Kho": r.get("Kho_quan_ly", "Kho 1")
                         })
             if debt_records:
                 df_debts = pd.DataFrame(debt_records)
-                tong_cong_no = df_debts["Số tiền nợ (VNĐ)"].sum()
-                st.error(f"### ⚠️ TỔNG CÔNG NỢ KHÁCH ĐANG NỢ: `{format_money(tong_cong_no)} VNĐ`")
+                st.error(f"### ⚠️ TỔNG CÔNG NỢ: `{format_money(df_debts['Số tiền nợ (VNĐ)'].sum())} VNĐ`")
                 st.markdown("---")
-                df_debts_display = df_debts.copy()
-                df_debts_display["Số tiền nợ (VNĐ)"] = df_debts_display["Số tiền nợ (VNĐ)"].apply(format_money)
-                st.dataframe(df_debts_display[["Ngày nợ", "Khách hàng", "SĐT", "Sản phẩm nợ", "Số tiền nợ (VNĐ)", "Kho"]], use_container_width=True)
-                st.markdown("---")
-                st.subheader("🤝 Gạch nợ / Xóa nợ khi khách thanh toán")
-                with st.form("pay_debt_form"):
-                    selected_debt_idx = st.selectbox("Chọn khoản nợ khách đã thanh toán:", range(len(debt_records)), format_func=lambda i: f"{debt_records[i]['Khách hàng']} - {debt_records[i]['Sản phẩm nợ']} ({format_money(debt_records[i]['Số tiền nợ (VNĐ)'])}đ)")
-                    btn_pay = st.form_submit_button("✅ XÁC NHẬN ĐÃ THU NỢ")
-                    if btn_pay:
-                        target = debt_records[selected_debt_idx]
-                        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
-                        db_m = df[(df["Ma_LK"] == target["Mã SP"]) & (df["Kho_quan_ly"] == target["Kho"])]
-                        if not db_m.empty:
-                            old_l = db_m.iloc[0].get("Nhat_ky", "")
-                            new_l = old_l.replace("📝 Ghi nợ công nợ", "✅ Đã thu xong nợ")
-                            supabase.table("Ton_kho").update({"Nhat_ky": new_l}).eq("Ma_LK", target["Mã SP"]).eq("Kho_quan_ly", target["Kho"]).execute()
-                            st.success("Đã cập nhật gạch nợ thành công!")
-                            st.rerun()
+                df_d_disp = df_debts.copy()
+                df_d_disp["Số tiền nợ (VNĐ)"] = df_d_disp["Số tiền nợ (VNĐ)"].apply(format_money)
+                st.dataframe(df_d_disp[["Ngày nợ", "Khách hàng", "SĐT", "Sản phẩm nợ", "Số tiền nợ (VNĐ)", "Kho"]], use_container_width=True)
             else:
-                st.success("🎉 Hiện tại không có khách hàng nào nợ tiền!")
-    # 4. CẢNH BÁO TỒN KHO THẤP
+                st.success("🎉 Không có khách hàng nào nợ tiền!")
+    # 14. CẢNH BÁO TỒN KHO (Đã chỉnh ngưỡng mặc định lên 20)
     elif menu_choice == "⚠️ Cảnh báo tồn kho":
         st.title("⚠️ CẢNH BÁO HÀNG SẮP HẾT KHO")
         st.markdown("---")
         if not df.empty:
-            nguong_canh_bao = st.number_input("Đặt ngưỡng cảnh báo số lượng tồn $\le$:", min_value=1, value=5, step=1)
+            nguong_canh_bao = st.number_input("Đặt ngưỡng cảnh báo số lượng tồn $\le$:", min_value=1, value=20, step=1)
             df_working = df.copy()
             df_working["So_luong"] = pd.to_numeric(df_working["So_luong"], errors="coerce").fillna(0)
             df_low_stock = df_working[df_working["So_luong"] <= nguong_canh_bao]
             if not df_low_stock.empty:
-                st.warning(f"🚨 Có **{len(df_low_stock)}** mặt hàng sắp hết kho cần nhập thêm gấp!")
+                st.warning(f"🚨 Có **{len(df_low_stock)}** mặt hàng có số lượng tồn kho $\le {nguong_canh_bao}$ cần nhập thêm gấp!")
                 df_low_display = df_low_stock[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi"]].copy()
                 df_low_display.columns = ["Mã QR", "Tên sản phẩm", "Kho", "Số lượng tồn", "Đơn vị"]
                 st.dataframe(df_low_display, use_container_width=True)
             else:
-                st.success("✅ Tất cả các mặt hàng đều đang có lượng tồn kho an toàn!")
-    # CÁC MỤC KHÁC GIỮ NGUYÊN CODE CŨ
-    elif menu_choice == "📊 Tổng quan tồn kho":
-        st.title("📦 TỒN KHO HỆ THỐNG")
-        st.dataframe(df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi"]], use_container_width=True)
-    elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
-        st.title("🔍 TRA CỨU & LỌC CHI TIẾT")
-        st.dataframe(df, use_container_width=True)
+                st.success(f"✅ Tất cả các mặt hàng đều có lượng tồn kho lớn hơn {nguong_canh_bao}!")
+    # 15. BÁO CÁO & XUẤT EXCEL (ĐÃ ĐƯA XUỐNG DƯỚI CÙNG)
     elif menu_choice == "📈 Báo cáo & Xuất Excel":
         st.title("📈 Báo Cáo Kho & Xuất File Excel")
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Ton_Kho', index=False)
-        st.download_button("📥 Tải file Excel", data=output.getvalue(), file_name="Bao_Cao_Ton_Kho.xlsx")
+        st.markdown("---")
+        st.info("💡 Tải toàn bộ dữ liệu tồn kho dưới dạng file **Excel (.xlsx)**.")
+        if not df.empty:
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_ton_kho = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach"]].copy()
+                df_ton_kho.columns = ["Mã QR", "Tên Sản Phẩm", "Kho", "Tồn Kho", "Đơn Vị", "Quy Cách"]
+                df_ton_kho.to_excel(writer, sheet_name='Ton_Kho', index=False)
+            st.download_button(
+                label="📥 Tải xuống file Excel tồn kho",
+                data=output.getvalue(),
+                file_name=f"Bao_Cao_Ton_Kho_{datetime.now().strftime('%d%m%Y')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary"
+            )
