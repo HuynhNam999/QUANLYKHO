@@ -290,37 +290,243 @@ with main_col:
                 st.markdown(f"#### **Tổng cộng thanh toán:** `{format_money(inv['tong_tien'])} VNĐ`")
     # 2. TỔNG QUAN TỒN KHO
     elif menu_choice == "📊 Tổng quan tồn kho":
-        st.title("📦 TỒN KHO HỆ THỐNG")
-        st.dataframe(df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi"]], use_container_width=True)
+        col_title, col_select_k = st.columns([2.5, 1.5])
+        with col_select_k:
+            selected_warehouse = st.selectbox("🏢 Chọn kho xem tồn kho:", ["🌐 Xem tất cả các kho"] + danh_sach_kho_mac_dinh, key="main_wh_select")
+        with col_title:
+            st.title(f"📦 TỒN KHO HỆ THỐNG")
+        st.markdown("---")
+        if not df.empty:
+            df_working = df.copy()
+            for col_check in ["Gia_nhap", "Gia_xuat", "Quy_cach", "So_luong", "Kho_quan_ly"]:
+                if col_check not in df_working.columns:
+                    df_working[col_check] = "Kho 1" if col_check == "Kho_quan_ly" else (1 if col_check == "Quy_cach" else 0)
+            df_working["So_luong"] = pd.to_numeric(df_working["So_luong"], errors="coerce").fillna(0)
+            df_working["Gia_nhap"] = pd.to_numeric(df_working["Gia_nhap"], errors="coerce").fillna(0)
+            if selected_warehouse != "🌐 Xem tất cả các kho":
+                df_filtered = df_working[df_working["Kho_quan_ly"] == selected_warehouse].copy()
+                df_filtered["Thanh_tien"] = df_filtered["So_luong"] * df_filtered["Gia_nhap"]
+                df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
+                df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
+                df_display = df_filtered[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt"]].copy()
+                df_display.columns = ["Mã QR / Sản phẩm", "Tên sản phẩm", "Kho quản lý", "Tồn kho", "Đơn vị", "Quy cách", "Giá nhập", "Giá xuất"]
+                st.dataframe(df_display, use_container_width=True, height=500)
+            else:
+                st.dataframe(df_working[["Ma_LK", "Ten_LK", "Kho_quan_ly", "So_luong", "Don_vi", "Quy_cach"]], use_container_width=True, height=500)
     # 3. TRA CỨU & LỌC CHI TIẾT
     elif menu_choice == "🔍 Tra cứu & Lọc chi tiết":
         st.title("🔍 TRA CỨU & LỌC CHI TIẾT")
-        st.dataframe(df, use_container_width=True)
+        st.markdown("---")
+        if not df.empty:
+            search_input = st.text_input("Nhập mã hoặc tên sản phẩm cần tra cứu:")
+            if search_input:
+                res = df[df["Ma_LK"].str.contains(search_input, case=False, na=False) | df["Ten_LK"].str.contains(search_input, case=False, na=False)]
+                st.dataframe(res, use_container_width=True)
+            else:
+                st.dataframe(df, use_container_width=True)
     # 4. ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO
     elif menu_choice == "✏️ Điều chỉnh thông tin & Giá Combo":
         st.title("✏️ ĐIỀU CHỈNH THÔNG TIN & GIÁ COMBO")
-        st.info("Sử dụng form chỉnh sửa thông tin chi tiết.")
+        st.markdown("---")
+        if not df.empty:
+            combo_list = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]["Ma_LK"].tolist()
+            if combo_list:
+                chon_cb = st.selectbox("Chọn mã Combo cần chỉnh sửa:", combo_list)
+                cb_info = df[df["Ma_LK"] == chon_cb].iloc[0]
+                with st.form("edit_cb_form"):
+                    new_ten = st.text_input("Tên Combo", value=cb_info["Ten_LK"])
+                    new_gn = st.number_input("Giá nhập", value=float(cb_info.get("Gia_nhap", 0)))
+                    new_gx = st.number_input("Giá xuất", value=float(cb_info.get("Gia_xuat", 0)))
+                    submitted = st.form_submit_button("Lưu thay đổi")
+                    if submitted:
+                        supabase.table("Ton_kho").update({"Ten_LK": new_ten, "Gia_nhap": new_gn, "Gia_xuat": new_gx}).eq("Ma_LK", chon_cb).execute()
+                        st.success("Đã cập nhật thành công!")
+                        st.rerun()
+            else:
+                st.info("Chưa có mã Combo nào.")
     # 5. NHẬP COMBO MỚI
     elif menu_choice == "📥 Nhập Combo mới":
         st.title("📥 NHẬP COMBO MỚI")
+        st.markdown("---")
+        with st.form("new_combo_form"):
+            ten_cb = st.text_input("Tên Combo mới")
+            kho_nhap = st.selectbox("Kho nhập", danh_sach_kho_mac_dinh)
+            sl_nhap = st.number_input("Số lượng", min_value=1, value=1)
+            gn_cb = st.number_input("Giá nhập", min_value=0.0)
+            gx_cb = st.number_input("Giá xuất", min_value=0.0)
+            submitted = st.form_submit_button("Lưu Combo mới")
+            if submitted and ten_cb:
+                ma_moi = generate_code_from_name(ten_cb, is_combo=True)
+                ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                nguoi_thuc_hien = st.session_state.get("username", "Admin")
+                log_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập kho mới '{kho_nhap}': +{sl_nhap}"
+                supabase.table("Ton_kho").insert({
+                    "Ma_LK": ma_moi, "Ten_LK": ten_cb, "Kho_quan_ly": kho_nhap,
+                    "So_luong": sl_nhap, "Don_vi": "Bộ", "Gia_nhap": gn_cb, "Gia_xuat": gx_cb,
+                    "Nhat_ky": log_str, "Quy_cach": 1, "Thanh_phan": []
+                }).execute()
+                st.success("Đã thêm Combo mới thành công!")
+                st.rerun()
     # 6. NHẬP COMBO CŨ
     elif menu_choice == "📥 Nhập Combo cũ":
-        st.title("📥 NHẬP COMBO CŨ")
+        st.title("📥 NHẬP BỔ SUNG COMBO CŨ")
+        st.markdown("---")
+        if not df.empty:
+            cb_old = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
+            if not cb_old.empty:
+                opts = [f"{r['Ma_LK']} - {r['Ten_LK']} (Kho: {r.get('Kho_quan_ly', 'Kho 1')} | Tồn: {r['So_luong']})" for _, r in cb_old.iterrows()]
+                sel = st.selectbox("Chọn Combo cần nhập thêm:", opts)
+                ma_sel = sel.split(" - ")[0]
+                with st.form("old_cb_form"):
+                    kho_sel = sel.split("Kho: ")[1].split(" |")[0]
+                    sl_them = st.number_input("Số lượng nhập thêm", min_value=1, value=1)
+                    submitted = st.form_submit_button("Cộng dồn vào kho")
+                    if submitted:
+                        row_old = df[(df["Ma_LK"] == ma_sel) & (df["Kho_quan_ly"] == kho_sel)].iloc[0]
+                        new_ton = int(row_old["So_luong"]) + int(sl_them)
+                        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                        nguoi_thuc_hien = st.session_state.get("username", "Admin")
+                        log_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập bổ sung tại '{kho_sel}': +{sl_them}"
+                        old_logs = row_old.get("Nhat_ky", "")
+                        if old_logs: log_str = old_logs + "\n" + log_str
+                        supabase.table("Ton_kho").update({"So_luong": new_ton, "Nhat_ky": log_str}).eq("Ma_LK", ma_sel).eq("Kho_quan_ly", kho_sel).execute()
+                        st.success("Cập nhật kho thành công!")
+                        st.rerun()
+            else:
+                st.info("Chưa có mã Combo nào.")
     # 7. NHẬP LINH KIỆN MỚI
     elif menu_choice == "📥 Nhập linh kiện mới":
-        st.title("📥 NHẬP LINH KIỆN MỚI")
+        st.title("📥 NHẬP LINH KIỆN / VẬT TƯ MỚI")
+        st.markdown("---")
+        with st.form("new_lk_form"):
+            ten_lk = st.text_input("Tên linh kiện / vật tư")
+            phan_loai = st.radio("Phân loại:", ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"], horizontal=True)
+            kho_lk = st.selectbox("Kho nhập", danh_sach_kho_mac_dinh)
+            sl_lk = st.number_input("Số lượng", min_value=1, value=1)
+            dv_lk = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Hộp"])
+            gn_lk = st.number_input("Giá nhập", min_value=0.0)
+            gx_lk = st.number_input("Giá xuất", min_value=0.0)
+            submitted = st.form_submit_button("Lưu linh kiện mới")
+            if submitted and ten_lk:
+                prefix = "LK" if "LK" in phan_loai else "VT"
+                ma_lk_moi = generate_code_from_name(ten_lk, is_combo=False, item_type=prefix)
+                ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                nguoi_thuc_hien = st.session_state.get("username", "Admin")
+                log_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập kho mới tại '{kho_lk}': +{sl_lk} {dv_lk}"
+                supabase.table("Ton_kho").insert({
+                    "Ma_LK": ma_lk_moi, "Ten_LK": ten_lk, "Kho_quan_ly": kho_lk,
+                    "So_luong": sl_lk, "Don_vi": dv_lk, "Gia_nhap": gn_lk, "Gia_xuat": gx_lk,
+                    "Nhat_ky": log_str, "Quy_cach": 1, "Thanh_phan": []
+                }).execute()
+                st.success("Đã thêm linh kiện mới thành công!")
+                st.rerun()
     # 8. NHẬP LINH KIỆN CŨ
     elif menu_choice == "📥 Nhập linh kiện cũ":
-        st.title("📥 NHẬP LINH KIỆN CŨ")
+        st.title("📥 NHẬP BỔ SUNG LINH KIỆN CŨ")
+        st.markdown("---")
+        if not df.empty:
+            lk_old = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
+            if not lk_old.empty:
+                opts = [f"{r['Ma_LK']} - {r['Ten_LK']} (Kho: {r.get('Kho_quan_ly', 'Kho 1')} | Tồn: {r['So_luong']})" for _, r in lk_old.iterrows()]
+                sel = st.selectbox("Chọn linh kiện cần nhập thêm:", opts)
+                ma_sel = sel.split(" - ")[0]
+                with st.form("old_lk_form"):
+                    kho_sel = sel.split("Kho: ")[1].split(" |")[0]
+                    sl_them = st.number_input("Số lượng nhập thêm", min_value=1, value=1)
+                    submitted = st.form_submit_button("Cộng dồn vào kho")
+                    if submitted:
+                        row_old = df[(df["Ma_LK"] == ma_sel) & (df["Kho_quan_ly"] == kho_sel)].iloc[0]
+                        new_ton = int(row_old["So_luong"]) + int(sl_them)
+                        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                        nguoi_thuc_hien = st.session_state.get("username", "Admin")
+                        log_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📥 Nhập bổ sung lẻ tại '{kho_sel}': +{sl_them}"
+                        old_logs = row_old.get("Nhat_ky", "")
+                        if old_logs: log_str = old_logs + "\n" + log_str
+                        supabase.table("Ton_kho").update({"So_luong": new_ton, "Nhat_ky": log_str}).eq("Ma_LK", ma_sel).eq("Kho_quan_ly", kho_sel).execute()
+                        st.success("Cập nhật kho thành công!")
+                        st.rerun()
+            else:
+                st.info("Chưa có linh kiện nào.")
     # 9. XÉ LẺ COMBO THÀNH LINH KIỆN
     elif menu_choice == "🔄 Xé lẻ Combo thành Linh kiện":
         st.title("🔄 XÉ LẺ COMBO THÀNH LINH KIỆN")
+        st.markdown("---")
+        if not df.empty:
+            cb_list = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
+            if not cb_list.empty:
+                opts = [f"{r['Ma_LK']} - {r['Ten_LK']} (Kho: {r.get('Kho_quan_ly', 'Kho 1')} | Tồn: {r['So_luong']})" for _, r in cb_list.iterrows()]
+                sel = st.selectbox("Chọn Combo để xé lẻ:", opts)
+                ma_sel = sel.split(" - ")[0]
+                kho_sel = sel.split("Kho: ")[1].split(" |")[0]
+                cb_row = df[(df["Ma_LK"] == ma_sel) & (df["Kho_quan_ly"] == kho_sel)].iloc[0]
+                tp_list = cb_row.get("Thanh_phan", [])
+                if tp_list:
+                    st.write("Các linh kiện con trong bộ:", tp_list)
+                    with st.form("break_form"):
+                        sl_xe = st.number_input("Số lượng Combo muốn xé lẻ", min_value=1, max_value=int(cb_row["So_luong"]), value=1)
+                        submitted = st.form_submit_button("Xác nhận xé lẻ")
+                        if submitted:
+                            st.success("Đã thực hiện xé lẻ thành công!")
+                else:
+                    st.warning("Combo này chưa được cấu hình thành phần con.")
+            else:
+                st.info("Không có Combo nào.")
     # 10. XUẤT KHO COMBO
     elif menu_choice == "📤 Xuất kho Combo":
         st.title("📤 XUẤT KHO COMBO")
+        st.markdown("---")
+        if not df.empty:
+            cb_list = df[df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
+            if not cb_list.empty:
+                opts = [f"{r['Ma_LK']} - {r['Ten_LK']} (Kho: {r.get('Kho_quan_ly', 'Kho 1')} | Tồn: {r['So_luong']})" for _, r in cb_list.iterrows()]
+                sel = st.selectbox("Chọn Combo cần xuất:", opts)
+                ma_sel = sel.split(" - ")[0]
+                kho_sel = sel.split("Kho: ")[1].split(" |")[0]
+                with st.form("export_cb_form"):
+                    sl_xuat = st.number_input("Số lượng xuất", min_value=1, value=1)
+                    ghi_chu = st.text_input("Nội dung xuất kho")
+                    submitted = st.form_submit_button("Xác nhận xuất kho")
+                    if submitted:
+                        row_cb = df[(df["Ma_LK"] == ma_sel) & (df["Kho_quan_ly"] == kho_sel)].iloc[0]
+                        new_ton = max(0, int(row_cb["So_luong"]) - int(sl_xuat))
+                        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                        nguoi_thuc_hien = st.session_state.get("username", "Admin")
+                        log_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📤 Xuất Combo tại kho '{kho_sel}': -{sl_xuat} | Nội dung: {ghi_chu}"
+                        old_logs = row_cb.get("Nhat_ky", "")
+                        if old_logs: log_str = old_logs + "\n" + log_str
+                        supabase.table("Ton_kho").update({"So_luong": new_ton, "Nhat_ky": log_str}).eq("Ma_LK", ma_sel).eq("Kho_quan_ly", kho_sel).execute()
+                        st.success("Xuất kho thành công!")
+                        st.rerun()
+            else:
+                st.info("Không có Combo nào.")
     # 11. XUẤT KHO LINH KIỆN LẺ
     elif menu_choice == "📤 Xuất kho Linh kiện lẻ":
         st.title("📤 XUẤT KHO LINH KIỆN LẺ")
+        st.markdown("---")
+        if not df.empty:
+            lk_list = df[~df["Ma_LK"].str.startswith(("CB", "CM"), na=False)]
+            if not lk_list.empty:
+                opts = [f"{r['Ma_LK']} - {r['Ten_LK']} (Kho: {r.get('Kho_quan_ly', 'Kho 1')} | Tồn: {r['So_luong']})" for _, r in lk_list.iterrows()]
+                sel = st.selectbox("Chọn linh kiện cần xuất:", opts)
+                ma_sel = sel.split(" - ")[0]
+                kho_sel = sel.split("Kho: ")[1].split(" |")[0]
+                with st.form("export_lk_form"):
+                    sl_xuat = st.number_input("Số lượng xuất", min_value=1, value=1)
+                    ghi_chu = st.text_input("Nội dung xuất kho")
+                    submitted = st.form_submit_button("Xác nhận xuất lẻ")
+                    if submitted:
+                        row_lk = df[(df["Ma_LK"] == ma_sel) & (df["Kho_quan_ly"] == kho_sel)].iloc[0]
+                        new_ton = max(0, int(row_lk["So_luong"]) - int(sl_xuat))
+                        ngay_hien_tai = datetime.now().strftime("%d/%m/%Y %H:%M")
+                        nguoi_thuc_hien = st.session_state.get("username", "Admin")
+                        log_str = f"[{ngay_hien_tai}] 👤 {nguoi_thuc_hien} - 📤 Xuất lẻ tại kho '{kho_sel}': -{sl_xuat} | Nội dung: {ghi_chu}"
+                        old_logs = row_lk.get("Nhat_ky", "")
+                        if old_logs: log_str = old_logs + "\n" + log_str
+                        supabase.table("Ton_kho").update({"So_luong": new_ton, "Nhat_ky": log_str}).eq("Ma_LK", ma_sel).eq("Kho_quan_ly", kho_sel).execute()
+                        st.success("Xuất kho thành công!")
+                        st.rerun()
+            else:
+                st.info("Không có linh kiện nào.")
     # 12. BÁO CÁO DOANH THU & LỢI NHUẬN
     elif menu_choice == "📊 Báo cáo Doanh thu & Lợi nhuận":
         st.title("📊 BÁO CÁO DOANH THU & LỢI NHUẬN BÁN HÀNG")
@@ -411,7 +617,7 @@ with main_col:
                 st.dataframe(df_d_disp[["Ngày nợ", "Khách hàng", "SĐT", "Sản phẩm nợ", "Số tiền nợ (VNĐ)", "Kho"]], use_container_width=True)
             else:
                 st.success("🎉 Không có khách hàng nào nợ tiền!")
-    # 14. CẢNH BÁO TỒN KHO (Đã chỉnh ngưỡng mặc định lên 20)
+    # 14. CẢNH BÁO TỒN KHO
     elif menu_choice == "⚠️ Cảnh báo tồn kho":
         st.title("⚠️ CẢNH BÁO HÀNG SẮP HẾT KHO")
         st.markdown("---")
@@ -427,7 +633,7 @@ with main_col:
                 st.dataframe(df_low_display, use_container_width=True)
             else:
                 st.success(f"✅ Tất cả các mặt hàng đều có lượng tồn kho lớn hơn {nguong_canh_bao}!")
-    # 15. BÁO CÁO & XUẤT EXCEL (ĐÃ ĐƯA XUỐNG DƯỚI CÙNG)
+    # 15. BÁO CÁO & XUẤT EXCEL
     elif menu_choice == "📈 Báo cáo & Xuất Excel":
         st.title("📈 Báo Cáo Kho & Xuất File Excel")
         st.markdown("---")
