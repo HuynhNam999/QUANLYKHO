@@ -8,14 +8,14 @@ import re
 import unicodedata
 import qrcode
 from PIL import Image
-# Cấu hình giao diện toàn màn hình và tự động tương thích thiết bị di động
+# Cấu hình giao diện toàn màn hình
 st.set_page_config(
-    page_title="Quản Lý Đa Kho, Bán Hàng & Định Vị Kho", 
+    page_title="Quản Lý Đa Kho, Bán Hàng & Vị Trí Kệ/Mâm", 
     page_icon="📦", 
     layout="wide",
     initial_sidebar_state="auto"
 )
-# CSS căn giữa bảng, tối ưu nút bấm và giao diện trên điện thoại di động
+# CSS căn giữa bảng, tối ưu nút bấm và giao diện di động
 st.markdown("""
     <style>
     div[data-testid="stDataFrame"] div[role="grid"] div[role="gridcell"] {
@@ -52,7 +52,7 @@ def init_supabase():
     key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 supabase: Client = init_supabase()
-# Tải dữ liệu tồn kho & tự động kiểm tra cấu trúc cột
+# Tải dữ liệu tồn kho
 @st.cache_data(ttl=0)
 def load_data():
     try:
@@ -60,18 +60,18 @@ def load_data():
         df_load = pd.DataFrame(response.data)
         if not df_load.empty:
             if "Kho_quan_ly" not in df_load.columns: df_load["Kho_quan_ly"] = "Kho 1"
-            if "Ke_kho" not in df_load.columns: df_load["Ke_kho"] = "Kệ A"
-            if "Tang_kho" not in df_load.columns: df_load["Tang_kho"] = "Tầng 1"
+            if "Ke_kho" not in df_load.columns: df_load["Ke_kho"] = "Kệ 1"
+            if "Tang_kho" not in df_load.columns: df_load["Tang_kho"] = "Mâm 1"
         return df_load
     except Exception as e:
         st.error(f"Lỗi kết nối cơ sở dữ liệu: {e}")
         return pd.DataFrame()
 df = load_data()
-# Định danh danh sách mặc định
+# Danh sách lựa chọn mặc định
 danh_sach_kho_mac_dinh = [f"Kho {i}" for i in range(1, 11)]
-danh_sach_ke_mac_dinh = [f"Kệ {k}" for k in ["A", "B", "C", "D", "E", "F", "G", "H"]]
-danh_sach_tang_mac_dinh = [f"Tầng {t}" for t in range(1, 6)]
-# Hàm định dạng tiền tệ chuẩn kế toán Việt Nam
+danh_sach_ke_mac_dinh = [f"Kệ {k}" for k in range(1, 11)]
+danh_sach_mam_mac_dinh = [f"Mâm {m}" for m in range(1, 7)]
+# Định dạng tiền tệ
 def format_money(val):
     try:
         if pd.isna(val) or val == "":
@@ -80,7 +80,7 @@ def format_money(val):
         return f"{num:,.0f}".replace(",", ".")
     except Exception:
         return "0"
-# Hàm loại bỏ dấu tiếng Việt & chuẩn hóa chuỗi để so sánh
+# Loại bỏ dấu tiếng Việt
 def remove_vietnamese_accent(text):
     if not text:
         return ""
@@ -88,7 +88,7 @@ def remove_vietnamese_accent(text):
     text = re.sub(r'[\u0300-\u036f]', '', text)
     text = text.replace('đ', 'd').replace('Đ', 'D')
     return text.strip().lower()
-# Hàm tự động sinh mã thông minh
+# Tự động sinh mã
 def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     if not full_name or not full_name.strip():
         return ""
@@ -109,7 +109,7 @@ def generate_code_from_name(full_name, is_combo=False, item_type="VT"):
     clean_code = re.sub(r'_+', '_', clean_code).strip('_')
     auto_code = f"{prefix}-{clean_code[:30]}"
     return auto_code.replace("__", "_").upper()
-# Hàm tạo ảnh QR Code từ một chuỗi văn bản/mã sản phẩm
+# Tạo ảnh QR Code
 def generate_qr_image(data_str):
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
     qr.add_data(data_str)
@@ -148,7 +148,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu!")
     st.stop()
-# --- MENU ĐIỀU HƯỚNG BÊN TRÁI ---
+# --- MENU BÊN TRÁI ---
 st.sidebar.title(f"👤 Xin chào: {st.session_state.username}")
 st.sidebar.markdown("---")
 st.sidebar.subheader("🗂️ Danh Mục Quản Lý")
@@ -156,7 +156,7 @@ menu_choice = st.sidebar.radio(
     "Chọn chức năng:",
     [
         "📊 Tổng quan tồn kho", 
-        "🗺️ Sơ đồ kho & Định vị vị trí",
+        "🗺️ Sơ đồ kho & Vị trí Kệ / Mâm",
         "🔍 Tra cứu & Lọc chi tiết", 
         "✏️ Điều chỉnh thông tin & Vị trí",
         "📥 Nhập Combo mới", 
@@ -179,7 +179,7 @@ if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.role = None
     st.session_state.username = None
     st.rerun()
-# --- GIAO DIỆN CHÍNH BÊN PHẢI ---
+# --- GIAO DIỆN CHÍNH ---
 _, main_col, _ = st.columns([0.05, 0.9, 0.05])
 with main_col:
     # 1. TỔNG QUAN TỒN KHO
@@ -198,7 +198,7 @@ with main_col:
             df_working = df.copy()
             for col_check in ["Gia_nhap", "Gia_xuat", "Quy_cach", "So_luong", "Kho_quan_ly", "Ke_kho", "Tang_kho"]:
                 if col_check not in df_working.columns:
-                    df_working[col_check] = "Kho 1" if col_check == "Kho_quan_ly" else ("Kệ A" if col_check == "Ke_kho" else ("Tầng 1" if col_check == "Tang_kho" else (1 if col_check == "Quy_cach" else 0)))
+                    df_working[col_check] = "Kho 1" if col_check == "Kho_quan_ly" else ("Kệ 1" if col_check == "Ke_kho" else ("Mâm 1" if col_check == "Tang_kho" else (1 if col_check == "Quy_cach" else 0)))
             df_working["So_luong"] = pd.to_numeric(df_working["So_luong"], errors="coerce").fillna(0)
             df_working["Gia_nhap"] = pd.to_numeric(df_working["Gia_nhap"], errors="coerce").fillna(0)
             if selected_warehouse != "🌐 Xem tất cả các kho":
@@ -217,46 +217,46 @@ with main_col:
                 df_filtered["Gia_nhap_fmt"] = df_filtered["Gia_nhap"].apply(format_money)
                 df_filtered["Gia_xuat_fmt"] = df_filtered["Gia_xuat"].apply(format_money)
                 df_display = df_filtered[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Ke_kho", "Tang_kho", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt"]].copy()
-                df_display.columns = ["Mã QR / Sản phẩm", "Tên sản phẩm", "Kho", "Kệ", "Tầng", "Tồn kho", "Đơn vị cơ bản", "Quy cách", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)"]
+                df_display.columns = ["Mã QR / Sản phẩm", "Tên sản phẩm", "Kho", "Vị trí Kệ", "Vị trí Mâm", "Tồn kho", "Đơn vị", "Quy cách", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)"]
                 st.dataframe(df_display, use_container_width=True, height=500)
             else:
                 df_working["Gia_nhap_fmt"] = df_working["Gia_nhap"].apply(format_money)
                 df_working["Gia_xuat_fmt"] = df_working["Gia_xuat"].apply(format_money)
                 df_display = df_working[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Ke_kho", "Tang_kho", "So_luong", "Don_vi", "Quy_cach", "Gia_nhap_fmt", "Gia_xuat_fmt"]].copy()
-                df_display.columns = ["Mã QR / Sản phẩm", "Tên sản phẩm", "Kho", "Kệ", "Tầng", "Tồn kho", "Đơn vị cơ bản", "Quy cách", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)"]
+                df_display.columns = ["Mã QR / Sản phẩm", "Tên sản phẩm", "Kho", "Vị trí Kệ", "Vị trí Mâm", "Tồn kho", "Đơn vị", "Quy cách", "Giá nhập (VNĐ)", "Giá xuất (VNĐ)"]
                 st.dataframe(df_display, use_container_width=True, height=500)
         else:
             st.info("Kho hiện đang trống. Hãy thêm sản phẩm mới!")
-    # 2. SƠ ĐỒ KHO & ĐỊNH VỊ VỊ TRÍ (TÍNH NĂNG MỚI)
-    elif menu_choice == "🗺️ Sơ đồ kho & Định vị vị trí":
-        st.title("🗺️ SƠ ĐỒ LƯU KHO & ĐỊNH VỊ VỊ TRÍ HÀNG HÓA")
+    # 2. SƠ ĐỒ KHO & VỊ TRÍ KỆ / MÂM
+    elif menu_choice == "🗺️ Sơ đồ kho & Vị trí Kệ / Mâm":
+        st.title("🗺️ SƠ ĐỒ LƯU KHO & TRA CỨU VỊ TRÍ KỆ / MÂM")
         st.markdown("---")
         if not df.empty:
             df_sd = df.copy()
-            if "Ke_kho" not in df_sd.columns: df_sd["Ke_kho"] = "Kệ A"
-            if "Tang_kho" not in df_sd.columns: df_sd["Tang_kho"] = "Tầng 1"
+            if "Ke_kho" not in df_sd.columns: df_sd["Ke_kho"] = "Kệ 1"
+            if "Tang_kho" not in df_sd.columns: df_sd["Tang_kho"] = "Mâm 1"
             c_f1, c_f2, c_f3 = st.columns(3)
             with c_f1:
                 loc_kho_sd = st.selectbox("🏢 Lọc Kho:", ["🌐 Tất cả các kho"] + danh_sach_kho_mac_dinh)
             with c_f2:
                 all_kes = sorted(list(set(df_sd["Ke_kho"].dropna().tolist() + danh_sach_ke_mac_dinh)))
-                loc_ke_sd = st.selectbox("📍 Lọc Kệ kho:", ["🌐 Tất cả các Kệ"] + all_kes)
+                loc_ke_sd = st.selectbox("📌 Lọc Kệ kho:", ["🌐 Tất cả các Kệ"] + all_kes)
             with c_f3:
-                all_tangs = sorted(list(set(df_sd["Tang_kho"].dropna().tolist() + danh_sach_tang_mac_dinh)))
-                loc_tang_sd = st.selectbox(" étages Lọc Tầng kho:", ["🌐 Tất cả các Tầng"] + all_tangs)
+                all_mams = sorted(list(set(df_sd["Tang_kho"].dropna().tolist() + danh_sach_mam_mac_dinh)))
+                loc_tang_sd = st.selectbox("🗄️ Lọc Mâm kệ:", ["🌐 Tất cả các Mâm"] + all_mams)
             if loc_kho_sd != "🌐 Tất cả các kho":
                 df_sd = df_sd[df_sd["Kho_quan_ly"] == loc_kho_sd]
             if loc_ke_sd != "🌐 Tất cả các Kệ":
                 df_sd = df_sd[df_sd["Ke_kho"] == loc_ke_sd]
-            if loc_tang_sd != "🌐 Tất cả các Tầng":
+            if loc_tang_sd != "🌐 Tất cả các Mâm":
                 df_sd = df_sd[df_sd["Tang_kho"] == loc_tang_sd]
             st.markdown(f"### 📍 Danh sách sản phẩm nằm tại vị trí đã lọc ({len(df_sd)} mặt hàng)")
             if not df_sd.empty:
                 df_sd_disp = df_sd[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Ke_kho", "Tang_kho", "So_luong", "Don_vi"]].copy()
-                df_sd_disp.columns = ["Mã QR", "Tên sản phẩm", "Kho quản lý", "Kệ kho", "Tầng kho", "Số lượng tồn", "Đơn vị tính"]
+                df_sd_disp.columns = ["Mã QR", "Tên sản phẩm", "Kho quản lý", "Kệ kho", "Mâm kệ", "Số lượng tồn", "Đơn vị tính"]
                 st.dataframe(df_sd_disp, use_container_width=True, height=450)
             else:
-                st.warning("⚠️ Không có sản phẩm nào ở vị trí Kệ/Tầng này.")
+                st.warning("⚠️ Không có sản phẩm nào ở vị trí Kệ / Mâm này.")
         else:
             st.info("Kho đang trống.")
     # 3. TRA CỨU & LỌC CHI TIẾT
@@ -270,8 +270,8 @@ with main_col:
                 m = str(r["Ma_LK"]).strip()
                 t = r["Ten_LK"]
                 kho = r.get("Kho_quan_ly", "Kho 1")
-                ke = r.get("Ke_kho", "Kệ A")
-                tang = r.get("Tang_kho", "Tầng 1")
+                ke = r.get("Ke_kho", "Kệ 1")
+                tang = r.get("Tang_kho", "Mâm 1")
                 dv = r["Don_vi"]
                 sl = r["So_luong"]
                 img = r.get("Hinh_anh", "")
@@ -304,16 +304,16 @@ with main_col:
                     st.info(f"""
 - 🏷️ **Tên sản phẩm:** **{target_item_info.get('Ten_LK', '')}**
 - 🔑 **Mã QR:** `{target_item_info.get('Ma_LK', '')}`
-- 🏢 **Vị trí lưu kho:** **{target_item_info.get('Kho_quan_ly', 'Kho 1')} ➔ {target_item_info.get('Ke_kho', 'Kệ A')} ➔ {target_item_info.get('Tang_kho', 'Tầng 1')}**
+- 🏢 **Vị trí lưu kho:** **{target_item_info.get('Kho_quan_ly', 'Kho 1')} ➔ {target_item_info.get('Ke_kho', 'Kệ 1')} ➔ {target_item_info.get('Tang_kho', 'Mâm 1')}**
 - 📦 **Số lượng tồn kho:** **{target_item_info.get('So_luong', 0)} {target_item_info.get('Don_vi', 'Cái')}**
 - 💰 **Giá nhập:** **{format_money(target_item_info.get('Gia_nhap', 0))} VNĐ** | 🏷️ **Giá xuất:** **{format_money(target_item_info.get('Gia_xuat', 0))} VNĐ**
                     """)
                 with col_info_qr:
                     qr_bytes = generate_qr_image(str(target_item_info.get('Ma_LK', '')))
                     st.image(qr_bytes, width=160)
-    # 4. ĐIỀU CHỈNH THÔNG TIN, GIÁ & VỊ TRÍ KHO
+    # 4. ĐIỀU CHỈNH THÔNG TIN & VỊ TRÍ
     elif menu_choice == "✏️ Điều chỉnh thông tin & Vị trí":
-        st.title("✏️ ĐIỀU CHỈNH THÔNG TIN, GIÁ & VỊ TRÍ (KỆ / TẦNG)")
+        st.title("✏️ ĐIỀU CHỈNH THÔNG TIN, GIÁ & VỊ TRÍ (KỆ / MÂM)")
         st.markdown("---")
         if not df.empty:
             all_edit_dict = {f"{r['Ma_LK']} - {r['Ten_LK']} ({r.get('Kho_quan_ly', 'Kho 1')})": r.to_dict() for _, r in df.iterrows()}
@@ -326,15 +326,15 @@ with main_col:
                     ma_e = st.text_input("Mã QR (Cố định)", value=selected_edit_item.get("Ma_LK", ""), disabled=True)
                     kho_def = selected_edit_item.get("Kho_quan_ly", "Kho 1")
                     kho_e = st.selectbox("🏢 Kho quản lý", danh_sach_kho_mac_dinh, index=danh_sach_kho_mac_dinh.index(kho_def) if kho_def in danh_sach_kho_mac_dinh else 0)
-                    ke_def = selected_edit_item.get("Ke_kho", "Kệ A")
-                    ke_e = st.selectbox("📍 Vị trí Kệ kho", danh_sach_ke_mac_dinh, index=danh_sach_ke_mac_dinh.index(ke_def) if ke_def in danh_sach_ke_mac_dinh else 0)
-                    tang_def = selected_edit_item.get("Tang_kho", "Tầng 1")
-                    tang_e = st.selectbox(" étages Vị trí Tầng kho", danh_sach_tang_mac_dinh, index=danh_sach_tang_mac_dinh.index(tang_def) if tang_def in danh_sach_tang_mac_dinh else 0)
+                    ke_def = selected_edit_item.get("Ke_kho", "Kệ 1")
+                    ke_e = st.selectbox("📌 Chọn Kệ kho", danh_sach_ke_mac_dinh, index=danh_sach_ke_mac_dinh.index(ke_def) if ke_def in danh_sach_ke_mac_dinh else 0)
+                    tang_def = selected_edit_item.get("Tang_kho", "Mâm 1")
+                    tang_e = st.selectbox("🗄️ Chọn Mâm kệ", danh_sach_mam_mac_dinh, index=danh_sach_mam_mac_dinh.index(tang_def) if tang_def in danh_sach_mam_mac_dinh else 0)
                 with c2:
                     gn_e = st.number_input("Giá nhập (VNĐ)", min_value=0, value=int(selected_edit_item.get("Gia_nhap", 0)))
                     gx_e = st.number_input("Giá xuất (VNĐ)", min_value=0, value=int(selected_edit_item.get("Gia_xuat", 0)))
                     sl_e = st.number_input("Điều chỉnh số lượng tồn", min_value=0, value=int(selected_edit_item.get("So_luong", 0)))
-                ghi_chu_e = st.text_input("Ghi chú điều chỉnh", placeholder="Ví dụ: Đổi vị trí sang Kệ B Tầng 2")
+                ghi_chu_e = st.text_input("Ghi chú điều chỉnh", placeholder="Ví dụ: Đổi vị trí sang Kệ 2 Mâm 3")
                 submit_edit = st.form_submit_button("💾 Cập nhật Thay đổi", type="primary", use_container_width=True)
                 if submit_edit:
                     try:
@@ -353,7 +353,7 @@ with main_col:
                             "Quy_cach": int(selected_edit_item.get("Quy_cach", 1))
                         }
                         supabase.table("Ton_kho").upsert(update_data).execute()
-                        st.success("Cập nhật vị trí thành công!")
+                        st.success("Cập nhật vị trí Kệ / Mâm thành công!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
@@ -367,8 +367,8 @@ with main_col:
             auto_cb_code = generate_code_from_name(ten_lk, is_combo=True)
             ma_lk = st.text_input("Mã QR Combo", value=auto_cb_code, key="new_cb_code")
             kho_nhap_cb = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, key="new_cb_kho")
-            ke_nhap_cb = st.selectbox("📍 Chọn Kệ kho", danh_sach_ke_mac_dinh, key="new_cb_ke")
-            tang_nhap_cb = st.selectbox(" étages Chọn Tầng kho", danh_sach_tang_mac_dinh, key="new_cb_tang")
+            ke_nhap_cb = st.selectbox("📌 Chọn Kệ kho", danh_sach_ke_mac_dinh, key="new_cb_ke")
+            tang_nhap_cb = st.selectbox("🗄️ Chọn Mâm kệ", danh_sach_mam_mac_dinh, key="new_cb_tang")
             don_vi = st.selectbox("Đơn vị tính cơ bản", ["Bộ", "Hộp", "Combo"], key="new_cb_dv")
             so_luong_nhap = st.number_input("Số lượng nhập", min_value=0, step=1, value=0, key="new_cb_sl")
         with c2:
@@ -403,8 +403,8 @@ with main_col:
             auto_code_nm = generate_code_from_name(ten_lk_moi, is_combo=False)
             ma_lk_moi = st.text_input("Mã QR Linh kiện", value=auto_code_nm, key="new_lk_code")
             kho_nhap_lk_moi = st.selectbox("🏢 Chọn kho nhập", danh_sach_kho_mac_dinh, key="new_lk_kho")
-            ke_nhap_lk_moi = st.selectbox("📍 Chọn Kệ kho", danh_sach_ke_mac_dinh, key="new_lk_ke")
-            tang_nhap_lk_moi = st.selectbox(" étages Chọn Tầng kho", danh_sach_tang_mac_dinh, key="new_lk_tang")
+            ke_nhap_lk_moi = st.selectbox("📌 Chọn Kệ kho", danh_sach_ke_mac_dinh, key="new_lk_ke")
+            tang_nhap_lk_moi = st.selectbox("🗄️ Chọn Mâm kệ", danh_sach_mam_mac_dinh, key="new_lk_tang")
             don_vi_lk_moi = st.selectbox("Đơn vị tính", ["Cái", "Chiếc", "Túi", "Cuộn", "Hộp", "Kg", "Bộ"], key="new_lk_dv")
             so_luong_nhap_lk_moi = st.number_input("Số lượng nhập", min_value=0, value=0, key="new_lk_sl")
         with c2:
@@ -428,7 +428,7 @@ with main_col:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Lỗi: {e}")
-    # 7. BÁN HÀNG & IN HÓA ĐƠN (POS HIỂN THỊ CẢ KỆ TẦNG)
+    # 7. BÁN HÀNG & IN HÓA ĐƠN (POS)
     elif menu_choice == "🛍️ Bán hàng & In hóa đơn (POS)":
         st.title("🛍️ MÀN HÌNH BÁN HÀNG & IN HÓA ĐƠN (POS)")
         st.markdown("---")
@@ -437,7 +437,7 @@ with main_col:
             all_sellable_items = {
                 str(r["Ma_LK"]).strip(): {
                     "Ma_LK": r["Ma_LK"], "Ten_LK": r["Ten_LK"], "Kho_quan_ly": r.get("Kho_quan_ly", "Kho 1"),
-                    "Ke_kho": r.get("Ke_kho", "Kệ A"), "Tang_kho": r.get("Tang_kho", "Tầng 1"),
+                    "Ke_kho": r.get("Ke_kho", "Kệ 1"), "Tang_kho": r.get("Tang_kho", "Mâm 1"),
                     "So_luong": r["So_luong"], "Don_vi": r["Don_vi"], "Gia_xuat": float(r.get("Gia_xuat", 0))
                 } for _, r in df.iterrows()
             }
@@ -465,7 +465,7 @@ with main_col:
                     df_cart = pd.DataFrame(st.session_state.cart)
                     df_cart["Thành tiền"] = (df_cart["Gia_xuat"] * df_cart["So_luong_mua"]).apply(format_money)
                     st.dataframe(df_cart[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Ke_kho", "Tang_kho", "So_luong_mua", "Thành tiền"]], use_container_width=True)
-    # 8. BÁO CÁO & XUẤT EXCEL (BAO GỒM CỘT KỆ & TẦNG)
+    # 8. BÁO CÁO & XUẤT EXCEL
     elif menu_choice == "📈 Báo cáo & Xuất Excel":
         st.title("📈 Báo Cáo Kho & Xuất File Excel")
         st.markdown("---")
@@ -473,10 +473,10 @@ with main_col:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_ton_kho = df[["Ma_LK", "Ten_LK", "Kho_quan_ly", "Ke_kho", "Tang_kho", "So_luong", "Don_vi", "Quy_cach"]].copy()
-                df_ton_kho.columns = ["Mã QR Sản Phẩm", "Tên Sản Phẩm", "Kho Quản Lý", "Kệ Kho", "Tầng Kho", "Số Lượng Tồn", "Đơn Vị Tính", "Quy Cách"]
+                df_ton_kho.columns = ["Mã QR Sản Phẩm", "Tên Sản Phẩm", "Kho Quản Lý", "Vị Trí Kệ", "Vị Trí Mâm", "Số Lượng Tồn", "Đơn Vị Tính", "Quy Cách"]
                 df_ton_kho.to_excel(writer, sheet_name='Ton_Kho_Hien_Tai', index=False)
             st.download_button(
-                label="📥 Tải xuống file Excel tồn kho (Có Kệ & Tầng)",
+                label="📥 Tải xuống file Excel tồn kho (Có Vị Trí Kệ/Mâm)",
                 data=output.getvalue(),
                 file_name=f"Bao_Cao_Ton_Kho_{datetime.now().strftime('%d%m%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
