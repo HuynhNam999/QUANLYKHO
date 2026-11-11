@@ -118,7 +118,7 @@ def generate_qr_image(data_str):
     buffered = io.BytesIO()
     img.save(buffered, format="PNG")
     return buffered.getvalue()
-# Quản lý đăng nhập (Đa tài khoản & Mật khẩu riêng phân quyền)
+# Quản lý đăng nhập
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
@@ -139,11 +139,6 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.role = "Nhân viên"
                 st.session_state.username = "Nhân viên An (Kho 1)"
-                st.rerun()
-            elif username_input in ["nhanvien1_binh", "nv1_phu"] and password == "123456":
-                st.session_state.logged_in = True
-                st.session_state.role = "Nhân viên"
-                st.session_state.username = "Nhân viên Bình (Kho 1)"
                 st.rerun()
             elif username_input == "nv_kho2" and password == "123456":
                 st.session_state.logged_in = True
@@ -390,7 +385,7 @@ with main_col:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
-    # 5. NHẬP COMBO MỚI (ĐÃ ĐẦY ĐỦ PHẦN 2 KHAI BÁO THÀNH PHẦN)
+    # 5. NHẬP COMBO MỚI (ĐÃ ĐẦY ĐỦ PHẦN 2 KHAI BÁO THÀNH PHẦN VỚI ĐỦ CÁC Ô NHẬP LIỆU)
     elif menu_choice == "📥 Nhập Combo mới":
         st.title("📦 KHAI BÁO & NHẬP MỚI COMBO SẢN PHẨM")
         st.markdown("---")
@@ -435,12 +430,22 @@ with main_col:
                 t_dv = st.selectbox(f"Đơn vị {i}", ["Cái", "Chiếc", "Bộ", "Kg", "Mét", "Túi", "Hộp"], key=f"new_tp_{i}_dv")
             with sub_c_gia:
                 t_gia = st.number_input(f"Giá LK {i} (VNĐ)", min_value=0, step=1000, value=0, format="%d", key=f"new_tp_{i}_gia")
-            auto_code_tp = generate_code_from_name(t_name, is_combo=False, item_type="LK")
-            final_tp_code = st.text_input(f"Mã QR linh kiện {i}", value=auto_code_tp, key=f"tp_{i}_code")
+            col_tp_type, col_tp_mode = st.columns(2)
+            with col_tp_type:
+                item_cat_tp = st.radio(f"Phân loại thành phần {i}:", ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"], horizontal=True, key=f"tp_{i}_type")
+            with col_tp_mode:
+                item_mode_tp = st.radio(f"Phương thức mã QR thành phần {i}:", ["🤖 Tự sinh", "✍️ Tự viết"], horizontal=True, key=f"tp_{i}_mode")
+            prefix_tp = "LK" if "LK" in item_cat_tp else "VT"
+            auto_code_tp = generate_code_from_name(t_name, is_combo=False, item_type=prefix_tp)
+            if item_mode_tp.startswith("🤖"):
+                final_tp_code = st.text_input(f"Mã QR linh kiện {i} (Tự động)", value=auto_code_tp, key=f"tp_{i}_show_auto", disabled=True)
+            else:
+                final_tp_code = st.text_input(f"Mã QR linh kiện {i} (Tự viết)", value=auto_code_tp, key=f"tp_{i}_code")
+            t_sub_img = st.text_input(f"Link ảnh linh kiện {i} (URL)", key=f"new_tp_{i}_img")
             st.markdown("---")
             tps_input.append({
                 "ten": t_name, "ma": final_tp_code, "sl": int(t_sl),
-                "dv": t_dv, "gia": int(t_gia), "img": ""
+                "dv": t_dv, "gia": int(t_gia), "img": t_sub_img.strip() if t_sub_img else ""
             })
         danh_sach_thanh_phan = [item for item in tps_input if item["ten"] and item["ten"].strip() != ""]
         if st.button("💾 Lưu Mới Combo vào Database", type="primary", use_container_width=True):
@@ -507,14 +512,16 @@ with main_col:
                         st.error(f"Lỗi: {e}")
         else:
             st.warning("Chưa có mã Combo nào!")
-    # 7. NHẬP LINH KIỆN MỚI (ĐÃ ĐẦY ĐỦ CÁC TRƯỜNG)
+    # 7. NHẬP LINH KIỆN MỚI
     elif menu_choice == "📥 Nhập linh kiện mới":
         st.title("🔩 KHAI BÁO & NHẬP MỚI LINH KIỆN / VẬT TƯ LẺ")
         st.markdown("---")
         c1, c2 = st.columns(2)
         with c1:
             ten_lk_moi = st.text_input("Tên linh kiện / vật tư mới", placeholder="VD: Bulong M24", key="new_lk_ten")
-            auto_code_nm = generate_code_from_name(ten_lk_moi, is_combo=False)
+            item_cat_nm = st.radio("Phân loại:", ["🔩 Vật tư (VT)", "⚙️ Linh kiện (LK)"], horizontal=True, key="new_lk_cat")
+            prefix_nm = "LK" if "LK" in item_cat_nm else "VT"
+            auto_code_nm = generate_code_from_name(ten_lk_moi, is_combo=False, item_type=prefix_nm)
             item_mode_nm = st.radio("Phương thức mã QR:", ["🤖 Tự sinh", "✍️ Tự viết"], horizontal=True, key="new_lk_mode")
             if item_mode_nm.startswith("🤖"):
                 ma_lk_moi = st.text_input("Mã QR (Tự động)", value=auto_code_nm, disabled=True, key="new_lk_auto")
@@ -658,7 +665,6 @@ with main_col:
                         log_str = f"[{ngay_gio}] 👤 {nguoi_thuc_hien} - 📤 Xuất kho: -{sl_xuat}"
                         if cb_row.get("Nhat_ky"): log_str = cb_row["Nhat_ky"] + "\n" + log_str
                         supabase.table("Ton_kho").update({"So_luong": ton_moi, "Nhat_ky": log_str}).eq("Ma_LK", selected_cb_ma).execute()
-                        # Trừ định mức linh kiện con
                         tp_list = cb_row.get("Thanh_phan", [])
                         if tp_list and isinstance(tp_list, list):
                             for tp in tp_list:
